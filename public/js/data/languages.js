@@ -11,6 +11,7 @@ export const LANGUAGES = [
   { id: "italian", name: "Italian" },
   { id: "japanese", name: "Japanese" },
   { id: "korean", name: "Korean" },
+  { id: "luganda", name: "Luganda (Uganda)" },
   { id: "mandarin", name: "Mandarin Chinese" },
   { id: "polish", name: "Polish" },
   { id: "portuguese", name: "Portuguese" },

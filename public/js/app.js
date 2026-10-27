@@ -183,9 +183,18 @@ function viewCard(deckId, index) {
       <a class="btn" href="#/card/${deck.id}/${next}" aria-label="Next card">▶</a>
     </div>
     <p class="muted center keys">Keys: <kbd>space</kbd> record · <kbd>F</kbd> flip · <kbd>←</kbd> <kbd>→</kbd> cards</p>
+    <div class="flip-bar"><button class="btn flip-btn" id="flip-btn" data-flip></button></div>
   `);
   renderFront();
   renderBack();
+}
+
+/** The flip button lives outside the card, pinned to the bottom of the screen, so it never scrolls away. */
+function updateFlipBtn() {
+  const b = document.getElementById("flip-btn");
+  if (!b) return;
+  b.textContent = cs.flipped ? "🎤 Flip back to try it" : cs.take ? "👂 Now flip it: hear it said right" : "👂 Flip to listen";
+  b.classList.toggle("nudge", !cs.flipped && !!cs.take);
 }
 
 function targetPicker() {
@@ -219,8 +228,8 @@ function renderFront() {
     </div>
     <div class="status" id="status">${micSupported() ? "Tap the microphone and say it." : "This browser can’t record audio. You can still flip the card to listen."}</div>
     <div id="result" aria-live="polite">${resultHtml()}</div>
-    <button class="btn flip-btn ${cs.take ? "nudge" : ""}" data-flip>${cs.take ? "Now flip it: hear it said right 👂" : "Flip to listen 👂"}</button>
   `;
+  updateFlipBtn();
 }
 
 function ago(t) {
@@ -354,14 +363,16 @@ function renderBack() {
       ${c.sentence ? `<button class="btn" data-say="${esc(c.sentence)}">💬 In a sentence</button>` : ""}
     </div>
     ${c.sentence ? `<p class="sentence-text center">“${esc(c.sentence)}”</p>` : ""}
-    ${detail}
-    <button class="btn flip-btn" data-flip>Flip to try 🎤</button>`;
+    ${detail}`;
 }
 
 function flip(to = !cs.flipped) {
   cs.flipped = to;
   document.getElementById("flip").classList.toggle("flipped", to);
   if (to) document.getElementById("back").scrollTop = 0;
+  updateFlipBtn();
+  const card = document.querySelector(".flip-scene");
+  if (card.getBoundingClientRect().top < 0) card.scrollIntoView({ behavior: "smooth" });
 }
 
 async function toggleRecord() {

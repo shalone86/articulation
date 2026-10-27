@@ -32,6 +32,7 @@ export const PHONEMES = [
     sentence: "Pat put the purple paper in a cup.",
     pairs: [["pig", "big"], ["pat", "bat"], ["pear", "bear"], ["cap", "cab"], ["pea", "bee"], ["pen", "fen"], ["copy", "coffee"]],
     esl: {
+      luganda: "Luganda p has no puff of air, so English ears can hear “big” for pig. Push out a puff at the start: p-h-ig.",
       arabic: "Arabic has no /p/, so it often becomes /b/: “bark” for park, “bin” for pin. Feel for the puff of air.",
       korean: "Korean /p/ may be unaspirated at the start of words and sound like /b/ to English ears. Push out a stronger puff.",
       tagalog: "/f/ words may be said with /p/ (“pan” for fan). Keep /p/ for p-words only.",
@@ -53,6 +54,7 @@ export const PHONEMES = [
     sentence: "Bob the baby bear bounced a big blue ball.",
     pairs: [["big", "pig"], ["bat", "pat"], ["cab", "cap"], ["berry", "very"], ["boat", "vote"], ["best", "vest"], ["rib", "rip"]],
     esl: {
+      luganda: "In Luganda a single b is soft: the lips don’t quite close (it is only a hard b in “mb” or “bb”). For English /b/, press your lips fully together every time, so “berry” doesn’t sound like “very”.",
       spanish: "In Spanish, b and v are the same sound, and between vowels b softens (lips don’t fully close). Close your lips all the way for /b/; use teeth-on-lip for /v/.",
       german: "At the end of a word, German turns /b/ into /p/ (“cap” for cab). Keep your voice on at the end, and make the vowel before it a little longer.",
       russian: "Russian devoices final consonants: “cab” sounds like “cap”. Keep the buzz going at the end of the word.",
@@ -76,6 +78,7 @@ export const PHONEMES = [
     sentence: "Tom tied two tents to the tall tree.",
     pairs: [["tie", "die"], ["ten", "den"], ["bat", "bad"], ["cart", "card"], ["tree", "three"], ["tin", "thin"]],
     esl: {
+      luganda: "Every Luganda word ends in a vowel, so an English final consonant can get an extra vowel (“hat-i”, “cat-i”). Stop cleanly on the t, with nothing after it.",
       hindi: "Hindi/Urdu has dental and retroflex t’s. English /t/ is in between: tongue tip on the gum ridge, with a puff of air.",
       spanish: "Spanish /t/ touches the teeth and has no puff of air. Move your tongue back to the ridge and add a puff.",
       french: "French /t/ is on the teeth with no puff. Move back to the gum ridge and add aspiration.",
@@ -96,6 +99,7 @@ export const PHONEMES = [
     sentence: "Dad’s dog dug a deep hole in the garden.",
     pairs: [["bed", "bet"], ["card", "cart"], ["dime", "time"], ["day", "they"], ["dough", "though"], ["side", "sight"]],
     esl: {
+      luganda: "Final d can pick up an extra vowel (“bed-i”), because Luganda words always end in a vowel. Stop on the d and keep your voice on.",
       german: "German turns final /d/ into /t/: “bed” sounds like “bet”. Keep your voice on and stretch the vowel.",
       russian: "Final /d/ devoices to /t/ (“bet” for bed). Keep the buzz and lengthen the vowel before it.",
       polish: "Final /d/ becomes /t/. Keep the buzz going.",
@@ -206,6 +210,7 @@ export const PHONEMES = [
     sentence: "I think three thin thieves thanked Theo.",
     pairs: [["think", "sink"], ["thick", "sick"], ["thin", "tin"], ["three", "tree"], ["three", "free"], ["thought", "fought"], ["mouth", "mouse"], ["bath", "bat"], ["path", "pass"], ["thank", "tank"]],
     esl: {
+      luganda: "Luganda has no “th”, so think often becomes “tink” or “sink”. Put your tongue tip between your teeth and blow gently.",
       french: "French has no “th”; it usually becomes /s/ (“sink” for think). Show the tip of your tongue.",
       german: "German has no “th”; it usually becomes /s/. Show the tip of your tongue.",
       japanese: "Often becomes /s/ (“sank you”). Tongue tip out between the teeth.",
@@ -237,6 +242,7 @@ export const PHONEMES = [
     sentence: "This is the feather that my brother gave mother.",
     pairs: [["they", "day"], ["though", "dough"], ["then", "den"], ["breathe", "breeze"], ["bathe", "bays"], ["there", "dare"], ["those", "doze"], ["than", "van"]],
     esl: {
+      luganda: "Luganda has no “th”, so this often becomes “dis” or “zis”. Tongue tip between your teeth, then turn your voice on.",
       french: "Often becomes /z/ (“zis” for this). Tongue tip between teeth, then buzz.",
       german: "Often becomes /z/ or /d/. Tongue tip between teeth, then buzz.",
       japanese: "Often becomes /z/ or /d/. Tongue tip between teeth, then buzz.",
@@ -268,6 +274,7 @@ export const PHONEMES = [
     sentence: "Sam sees seven silly snakes sitting in the sun.",
     pairs: [["sink", "think"], ["sick", "thick"], ["sip", "ship"], ["sea", "she"], ["sue", "zoo"], ["bus", "buzz"], ["ice", "eyes"], ["sun", "ton"], ["seat", "sheet"]],
     esl: {
+      luganda: "Luganda doesn’t put s in front of another consonant, so a vowel can sneak in: “sukulu” for school, “sipoon” for spoon. Hold the hiss and go straight on: sss-kool.",
       spanish: "Many Spanish speakers add an “e” before s + consonant (“espeak”, “eschool”). Start straight on the hiss: sssspeak.",
       portuguese: "Brazilian speakers may add a vowel before s-clusters (“eschool”) and between consonants. Go straight into the hiss.",
       arabic: "Arabic speakers may add a vowel before s-clusters (“estreet” or “sitreet”). Glide straight from /s/ into the next consonant.",
@@ -319,6 +326,7 @@ export const PHONEMES = [
     sentence: "She sells shiny shells by the seashore.",
     pairs: [["ship", "chip"], ["shoe", "chew"], ["sheep", "cheap"], ["she", "see"], ["ship", "sip"], ["wash", "watch"], ["share", "chair"], ["shoes", "choose"]],
     esl: {
+      luganda: "Luganda has no “sh” of its own, so ship can come out close to “sip”. Round your lips and pull your tongue a little further back: shhh, like asking for quiet.",
       spanish: "Many Spanish dialects have no /ʃ/; it is often said as “ch” (“chip” for ship) — and sometimes the reverse. /ʃ/ is a smooth flowing sound with no stop at the start.",
       french: "French has /ʃ/ but no “ch” /tʃ/, so learners say “sheep” for cheap. Keep /ʃ/ smooth and start /tʃ/ with a tap.",
       portuguese: "Fine on its own; watch the difference from “ch” (sheep/cheap).",
@@ -344,6 +352,7 @@ export const PHONEMES = [
     sentence: "We usually measure the treasure on television.",
     pairs: [["measure", "major"], ["vision", "pigeon"], ["leisure", "ledger"]],
     esl: {
+      luganda: "Luganda has no /ʒ/, so it often becomes “j” or “z” (“vijon” for vision). Say shhh, then turn your voice on.",
       spanish: "Spanish has no /ʒ/; it often becomes “j” /dʒ/, “sh”, or /s/ (“vishon” for vision). Make shh and add your voice.",
       italian: "Often becomes /dʒ/ or /ʃ/. Make shh and add your voice.",
       korean: "Often becomes /dʒ/. Smooth buzz, no stop.",
@@ -488,6 +497,7 @@ export const PHONEMES = [
     sentence: "The king was singing a long song while swinging.",
     pairs: [["sing", "sink"], ["thing", "think"], ["sing", "sin"], ["wing", "win"], ["rang", "ran"], ["bang", "bank"], ["ring", "rink"]],
     esl: {
+      luganda: "Luganda has the ŋ sound, but never at the end of a word, so “sing” can come out as “sing-g” or “singi”. Stop on the hum: no g, no vowel after it.",
       polish: "Polish has /ŋ/ only before k/g, so final “ng” often comes out as “nk” or “ng-g” (“sink” for sing). End with a hum — no click.",
       russian: "Russian has no /ŋ/: it becomes /n/, /ng/ or /nk/ (“sink” for sing). Hum through your nose and stop.",
       german: "German has /ŋ/ (singen) — use it. Don’t devoice it to “nk” at the end.",
@@ -516,6 +526,7 @@ export const PHONEMES = [
     sentence: "Lucy’s little lamb liked yellow lollipops.",
     pairs: [["light", "right"], ["lock", "rock"], ["glass", "grass"], ["fly", "fry"], ["collect", "correct"], ["lead", "read"], ["long", "wrong"], ["lamb", "ram"]],
     esl: {
+      luganda: "In Luganda, l and r are one sound (r after e and i, l elsewhere), so rice and lice, fry and fly can sound alike. For /l/, press your tongue tip on the ridge behind your top teeth and let the air flow around the sides.",
       japanese: "Japanese has one sound between /l/ and /r/. For /l/, press your tongue tip on the ridge and hold it there. For /r/, the tip touches nothing.",
       korean: "Korean ㄹ switches between l-like and r-like. English /l/ always touches the ridge; English /r/ never does.",
       mandarin: "Watch light/right and the “dark L” at the end of words (Mandarin may drop it or say “o”: “bo” for ball). Some southern speakers mix /l/ with /n/.",
@@ -541,6 +552,7 @@ export const PHONEMES = [
     sentence: "Rosie the red rabbit ran around the green garden.",
     pairs: [["right", "light"], ["rock", "lock"], ["grass", "glass"], ["fry", "fly"], ["red", "wed"], ["ring", "wing"], ["rake", "wake"], ["wrong", "long"]],
     esl: {
+      luganda: "Luganda treats r and l as one sound, so rice can sound like “lice” and fry like “fly”. For English /r/, the tongue tip touches nothing: pull it back, round your lips a little, and hold it.",
       japanese: "Japanese r is a quick tap that can sound like /l/ or /d/ to English ears. English /r/: tongue pulled back, tip touches nothing, lips slightly round. Hold it: rrrr.",
       korean: "Korean ㄹ is a tap. English /r/ has no tap — pull your tongue back and hold it.",
       mandarin: "Mandarin “r” is close to English /r/ — use it, but don’t let it buzz like /ʒ/. Watch r vs l.",
@@ -621,6 +633,7 @@ export const PHONEMES = [
     sentence: "The black cat sat on a fat hat.",
     pairs: [["bad", "bed"], ["man", "men"], ["cat", "cut"], ["bag", "bug"], ["hat", "hot"], ["cap", "cop"], ["sat", "set"], ["pan", "pen"]],
     esl: {
+      luganda: "Luganda has one a sound, so cat, cut and cart can all sound the same. For cat, drop your jaw and spread your lips wide.",
       spanish: "Spanish has one “a” sound, so cat, cut and cot can all sound alike. For cat, open wide and spread your lips.",
       italian: "Italian has one “a” sound. Spread your lips and drop your jaw for cat.",
       japanese: "Often said like Japanese あ, which sounds closer to “cut”. Spread your lips and push your tongue forward.",
@@ -647,6 +660,7 @@ export const PHONEMES = [
     sentence: "Ten red hens fed in the shed.",
     pairs: [["bed", "bad"], ["pen", "pan"], ["set", "sat"], ["bet", "bait"], ["pen", "pin"], ["get", "gate"], ["men", "man"], ["wet", "wait"]],
     esl: {
+      luganda: "Close to Luganda e, which is good. Keep it short, with no glide to “ay” at the end.",
       spanish: "Spanish e is closer to “ay” in bait. Keep English /ɛ/ short, with no glide at the end.",
       japanese: "Japanese え is close — use it, but keep it short.",
       russian: "Russian э is close. Watch bed vs bad.",
@@ -665,6 +679,7 @@ export const PHONEMES = [
     sentence: "Little Jill will fill the big tin with milk.",
     pairs: [["ship", "sheep"], ["sit", "seat"], ["live", "leave"], ["fill", "feel"], ["hit", "heat"], ["bit", "beat"], ["chip", "cheap"], ["pin", "pen"], ["pick", "peak"]],
     esl: {
+      luganda: "Luganda i is always “ee” (short or long), so ship and sheep can sound alike. For ship, relax your mouth and don’t smile; it is short and loose.",
       spanish: "Spanish has only “ee”, so ship and sheep sound the same. For ship, relax your mouth and keep it short.",
       italian: "Italian has only “ee”. Relax for ship, smile and stretch for sheep.",
       portuguese: "Ship and sheep often merge. Relax and shorten for /ɪ/.",
@@ -692,6 +707,7 @@ export const PHONEMES = [
     sentence: "Tom got a hot pot of soup from the shop.",
     pairs: [["hot", "hat"], ["cop", "cup"], ["not", "nut"], ["lock", "luck"], ["shot", "shut"], ["cot", "coat"], ["box", "bucks"]],
     esl: {
+      luganda: "Ugandan English uses a round o for hot, like British English. In American English, open wide with no lip rounding: “haht”.",
       spanish: "Spanish speakers often use a round “o” for hot. In American English, open wide with no lip rounding: “haht”.",
       italian: "Use an open “ah”, not a round “o”.",
       german: "Use an open “ah”, not a round “o”.",
@@ -711,6 +727,7 @@ export const PHONEMES = [
     sentence: "My mother loves the fun bus from London.",
     pairs: [["cup", "cop"], ["cut", "cat"], ["luck", "lock"], ["bug", "bag"], ["hut", "hot"], ["dull", "doll"], ["cut", "caught"], ["luck", "look"]],
     esl: {
+      luganda: "Luganda has no “uh” vowel, so cup often becomes “cap” or “cop”. Let your jaw drop halfway and relax everything: uh.",
       spanish: "Spanish speakers often use “a” or “o” for /ʌ/ (“cop” or “cap” for cup). Relax your mouth — “uh”.",
       japanese: "Often becomes あ. Relax your mouth and keep it short.",
       korean: "Korean 어 is close — use it!",
@@ -734,6 +751,7 @@ export const PHONEMES = [
     sentence: "The good cook took a look at the book.",
     pairs: [["full", "fool"], ["pull", "pool"], ["look", "Luke"], ["could", "cooed"], ["would", "wooed"], ["look", "luck"], ["book", "buck"]],
     esl: {
+      luganda: "Luganda u is always “oo”, so full and fool sound alike. For full, relax your lips and keep it short.",
       spanish: "Spanish has only “oo”, so full and fool sound the same. For full, relax your lips and keep it short.",
       italian: "Italian has only “oo”. Relax your lips for /ʊ/.",
       french: "French has only “ou”. Relax your lips for /ʊ/.",
@@ -754,6 +772,7 @@ export const PHONEMES = [
     sentence: "A banana and a lemon are on the sofa today.",
     pairs: [],
     esl: {
+      luganda: "Luganda says every vowel fully, so “banana” comes out as ba-na-na. In English only the stressed syllable gets a full vowel; the rest shrink to a quick “uh”: bə-NA-nə.",
       spanish: "Spanish says every vowel fully, so “banana” sounds like ba-na-na. In English only the stressed syllable gets a full vowel: bə-NA-nə.",
       italian: "Italian pronounces every vowel fully. Squash the unstressed ones into a quick “uh”.",
       japanese: "Japanese gives every syllable equal time. In English, unstressed syllables are short and lazy.",
@@ -795,6 +814,7 @@ export const PHONEMES = [
     sentence: "Jay ate eight grapes on a rainy day in May.",
     pairs: [["gate", "get"], ["late", "let"], ["wait", "wet"], ["pain", "pen"], ["sale", "sell"], ["main", "men"], ["paper", "pepper"]],
     esl: {
+      luganda: "Ugandan English often uses a pure e here, so gate sounds like “get” or “geet”. Glide up to ee at the end: g-ay-t.",
       spanish: "Spanish “e” is close but doesn’t glide as much. Add the “ee” at the end: g-ay-t.",
       german: "German “ee” (See) doesn’t glide. Add a glide toward “ee”.",
       french: "French é doesn’t glide. Add a glide toward “ee”.",
@@ -831,6 +851,7 @@ export const PHONEMES = [
     sentence: "Joe rode slowly home in the cold snow.",
     pairs: [["coat", "caught"], ["boat", "bought"], ["low", "law"], ["woke", "walk"], ["coat", "cut"], ["phone", "fun"], ["road", "rod"]],
     esl: {
+      luganda: "Often said as a pure o, so boat can sound like “bought”. Round your lips more at the end: oh-oo.",
       spanish: "Spanish o doesn’t glide. Round more at the end: oh-oo.",
       italian: "Italian o doesn’t glide. Add the “oo” glide.",
       german: "German o doesn’t glide. Add the “oo” glide.",
@@ -927,6 +948,7 @@ export const PHONEMES = [
     sentence: "The first girl heard the bird chirp at the church.",
     pairs: [["bird", "bed"], ["word", "ward"], ["her", "hair"], ["fur", "far"], ["shirt", "shot"], ["hurt", "heart"], ["girl", "gull"]],
     esl: {
+      luganda: "Ugandan English follows British English and doesn’t say r after a vowel, so bird can sound like a long “bed”. In American English the vowel IS the r: pull your tongue back and growl.",
       spanish: "Spanish speakers often say a vowel + tapped r (“beerd”, “gairl”). In English the vowel IS the r — just growl.",
       japanese: "Often becomes あー (“baado” for bird). Pull your tongue back and growl.",
       korean: "Often becomes 어 (“bud”). Pull your tongue back and growl.",
@@ -953,6 +975,7 @@ export const PHONEMES = [
     sentence: "Mark parked the car far from the dark barn.",
     pairs: [["heart", "hot"], ["card", "cod"], ["farm", "firm"], ["star", "stir"], ["barn", "burn"], ["park", "perk"]],
     esl: {
+      luganda: "Without the American r, car sounds like “kaa”. Open for “ah”, then pull your tongue back for r at the end.",
       german: "Don’t drop the r (“kah” for car). American English pronounces it.",
       spanish: "Don’t tap or trill the r. Pull your tongue back smoothly.",
       japanese: "Often becomes “aa” (“kaa” for car). Add the r-curl.",
@@ -968,6 +991,7 @@ export const PHONEMES = [
     sentence: "Four horses ran north through the storm to the door.",
     pairs: [["for", "far"], ["court", "cart"], ["born", "burn"], ["ward", "word"], ["torn", "turn"], ["store", "star"]],
     esl: {
+      luganda: "Without the American r, door sounds like “doo-a” or “daw”. Round for “aw”, then add a smooth r.",
       german: "Pronounce the r at the end.",
       spanish: "Don’t tap the r. Pull your tongue back smoothly.",
       japanese: "Often becomes “oo” (“foo” for four). Add the r-curl.",

@@ -77,7 +77,12 @@ def model() -> WhisperModel:
 async def passcode(request: Request, call_next):
     if PASSCODE and request.url.path.startswith("/api/") and request.headers.get("x-app-passcode") != PASSCODE:
         return JSONResponse({"error": "passcode required"}, status_code=401)
-    return await call_next(request)
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        # The app's files have no version in their names, so make browsers and proxies
+        # check for a new copy each time (a cheap 304 when nothing changed).
+        response.headers["cache-control"] = "no-cache"
+    return response
 
 
 @app.get("/api/health")
@@ -195,6 +200,10 @@ def kokoro_engine():
 
 
 def kokoro_wav(text: str, voice: str) -> bytes:
+    # Without a sentence ending Kokoro tends to trail off into an extra vowel:
+    # Whisper hears "bee" as "B.A." and "tea" as "T.A.", but "bee." as "B".
+    if text[-1].isalnum():
+        text += "."
     k = kokoro_engine()
     with _kokoro_lock:
         if voice not in k.get_voices():
