@@ -121,20 +121,34 @@ function viewDeck(id) {
   const deck = deckById[id];
   if (!deck) return (location.hash = "#/");
   const cards = deck.cards();
+  const resumeAt = store.resume(id) ?? 0;
+  const started = cards.filter((c) => store.cardStatus(c.id) !== "new").length;
+  const mastered = cards.filter((c) => store.cardStatus(c.id) === "mastered").length;
   render(`
     <nav class="crumbs"><a href="#/">Home</a> › ${esc(deck.name)}</nav>
     <h1>${deck.emoji} ${esc(deck.name)}</h1>
     ${deck.describe ? `<p class="muted">${esc(deck.describe())}</p>` : ""}
-    ${cards.length ? `<a class="btn primary" href="#/card/${id}/0">▶ Start practicing</a>` : ""}
+    ${cards.length ? `<div class="deck-progress" aria-hidden="true"><div style="width:${Math.round((mastered / cards.length) * 100)}%"></div></div>
+      <p class="muted small">${started} of ${cards.length} tried · ${mastered} mastered ★★★</p>
+      <div class="actions start">
+        ${resumeAt > 0 && cards[resumeAt] ? `<a class="btn primary" href="#/card/${id}/${resumeAt}">▶ Continue: ${esc(cards[resumeAt].big)} (card ${resumeAt + 1})</a>` : ""}
+        <a class="btn ${resumeAt > 0 && cards[resumeAt] ? "" : "primary"}" href="#/card/${id}/0">${resumeAt > 0 && cards[resumeAt] ? "↺ From the start" : "▶ Start practicing"}</a>
+      </div>` : ""}
     <div class="card-grid">
-      ${cards.map((c, i) => `
-        <a class="mini-card" href="#/card/${id}/${i}">
+      ${cards.map((c, i) => {
+        const st = store.cardStatus(c.id);
+        const p = store.cardProgress(c.id);
+        const badge = { new: "", tried: "○ tried", learning: `◐ ${p.wins}/${p.tries}`, mastered: "✓ mastered" }[st];
+        return `
+        <a class="mini-card ${st}" href="#/card/${id}/${i}" title="${st === "new" ? "Not tried yet" : `${p.wins} of ${p.tries} tries matched`}">
           <span class="emoji">${c.emoji ?? ""}</span>
           <b>${esc(c.big)}</b>
           ${c.ipa ? ipa(c.ipa) : ""}
           <small>${esc(c.words[0])}</small>
           ${stars(store.stars(c.id))}
-        </a>`).join("") || `<p class="muted">Nothing here yet.</p>`}
+          <span class="badge">${badge || "&nbsp;"}</span>
+        </a>`;
+      }).join("") || `<p class="muted">Nothing here yet.</p>`}
     </div>`);
 }
 
@@ -155,6 +169,7 @@ function viewCard(deckId, index) {
   if (!cards[index]) return (location.hash = `#/deck/${deckId}`);
   const card = cards[index];
   cs = { deck, cards, index, card, target: card.words[0], isSentence: false, flipped: false, take: null, result: null, busy: false };
+  store.setResume(deck.id, index);
   const prev = (index - 1 + cards.length) % cards.length;
   const next = (index + 1) % cards.length;
   render(`
@@ -176,7 +191,10 @@ function viewCard(deckId, index) {
 function targetPicker() {
   const c = cs.card;
   return `<div class="targets" role="group" aria-label="Choose what to practice">
-    ${c.words.map((w) => `<button class="chip ${!cs.isSentence && w === cs.target ? "on" : ""}" data-target="${esc(w)}">${esc(w)}</button>`).join("")}
+    ${c.words.map((w) => {
+      const st = store.wordStatus(c.id, w);
+      return `<button class="chip ${st} ${!cs.isSentence && w === cs.target ? "on" : ""}" data-target="${esc(w)}" title="${st === "won" ? "You’ve said this one right" : st === "tried" ? "Tried, not matched yet" : "Not tried yet"}">${esc(w)}${st === "won" ? ` <span class="mk">✓</span>` : st === "tried" ? ` <span class="mk">○</span>` : ""}</button>`;
+    }).join("")}
     ${c.sentence ? `<button class="chip sentence ${cs.isSentence ? "on" : ""}" data-target="__sentence">💬 sentence</button>` : ""}
   </div>`;
 }
@@ -195,13 +213,59 @@ function renderFront() {
     <div class="tags">${tags}</div>
     <p class="say-this">Say: <strong class="${cs.isSentence ? "sentence-text" : "word-text"}">${esc(target)}</strong></p>
     ${targetPicker()}
+    ${historyHtml()}
     <div class="rec-row">
       <button class="rec" id="rec" aria-label="Record">${recorder.state === "recording" ? "⏹" : "🎤"}</button>
     </div>
     <div class="status" id="status">${micSupported() ? "Tap the microphone and say it." : "This browser can’t record audio. You can still flip the card to listen."}</div>
     <div id="result" aria-live="polite">${resultHtml()}</div>
-    <button class="btn flip-btn" data-flip>Flip to listen 👂</button>
+    <button class="btn flip-btn ${cs.take ? "nudge" : ""}" data-flip>${cs.take ? "Now flip it: hear it said right 👂" : "Flip to listen 👂"}</button>
   `;
+}
+
+function ago(t) {
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`;
+  const d = Math.round(h / 24);
+  return `${d} day${d === 1 ? "" : "s"} ago`;
+}
+
+/** What this learner has already done on this card, from saved progress. */
+function historyHtml() {
+  const p = store.cardProgress(cs.card.id);
+  if (!p.tries) return `<p class="history">🆕 New card: you haven’t tried it yet.</p>`;
+  const good = p.last === "correct" || p.last === "homophone";
+  return `<p class="history">${good ? "✅" : "🔁"} Last try ${ago(p.at)} · ${p.wins} of ${p.tries} matched</p>`;
+}
+
+const isWin = (r) => !!r && !r.error && (r.sentence ? r.sentence.score >= 0.9 : !!r.score && isSuccess(r.score));
+
+/** A little celebration on `el`: a glow, plus a confetti burst unless the user prefers less motion. */
+function celebrate(el) {
+  if (!el) return;
+  el.classList.remove("win");
+  void el.offsetWidth;
+  el.classList.add("win");
+  setTimeout(() => el.classList.remove("win"), 1200);
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const r = el.getBoundingClientRect();
+  const layer = document.createElement("div");
+  layer.className = "confetti";
+  layer.style.left = `${r.left + r.width / 2}px`;
+  layer.style.top = `${Math.max(r.top, 0) + Math.min(r.height, innerHeight) / 3}px`;
+  const colors = ["#f5a524", "#4f46e5", "#22a55b", "#e11d48", "#0ea5e9"];
+  for (let i = 0; i < 28; i++) {
+    const s = document.createElement("i");
+    const a = Math.random() * Math.PI * 2;
+    const d = 80 + Math.random() * 130;
+    s.style.cssText = `--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 60}px;--rot:${Math.random() * 720 - 360}deg;background:${colors[i % colors.length]};animation-delay:${Math.random() * 60}ms`;
+    layer.append(s);
+  }
+  document.body.append(layer);
+  setTimeout(() => layer.remove(), 1400);
 }
 
 function resultHtml() {
@@ -361,6 +425,7 @@ async function finishRecording() {
   if (cs.card === myCard) {
     renderFront();
     document.getElementById("status").textContent = "Tap the microphone to try again.";
+    if (isWin(cs.result)) celebrate(document.getElementById("front"));
   }
 }
 
@@ -503,6 +568,7 @@ function nextPair() {
       const ok = b.dataset.choice === target;
       store.recordPair(ok);
       b.classList.add(ok ? "right" : "wrong");
+      if (ok) celebrate(b);
       if (!ok) game.querySelector(`[data-choice="${CSS.escape(target)}"]`)?.classList.add("right");
       document.getElementById("pair-fb").innerHTML = `
         <div class="feedback ${ok ? "good" : "warn"}">
@@ -528,6 +594,7 @@ function nextPair() {
       try {
         const take = await recorder.stop();
         let html;
+        let won = false;
         if (!take.speech) html = `<div class="feedback warn"><p>🙉 I didn’t hear anything. Try again.</p></div>`;
         else if (!(await health()).stt) html = `<div class="feedback warn"><p>The speech checker is offline.</p></div><button class="btn" id="mine">▶ My try</button>`;
         else {
@@ -535,6 +602,7 @@ function nextPair() {
           const { text, scores } = await transcribe(take.wav, candidatesFor(target, pairs));
           const s = refineWithScores(scoreWord(target, text, { pairs }), target, scores, pairs);
           const ok = isSuccess(s);
+          won = ok;
           if (s.result !== "nothing") store.recordPair(ok);
           html = `<div class="feedback ${ok ? "good" : "warn"}"><p><b>${
             ok ? `✅ That sounded like “${esc(target)}”.` : s.result === "swap" ? `🤔 That sounded like “${esc(other)}”.` : s.result === "nothing" ? "🙉 I didn’t catch that." : `🤔 I heard “${esc(s.word ?? s.heard)}”.`
@@ -542,6 +610,7 @@ function nextPair() {
           <button class="btn" id="mine">▶ My try</button>`;
         }
         fb.innerHTML = html + `<button class="btn primary" id="next-pair">Next →</button>`;
+        if (won) celebrate(document.getElementById("game"));
         document.getElementById("mine")?.addEventListener("click", () => playUrl(take.url));
         document.getElementById("next-pair").onclick = nextPair;
       } catch (e) {

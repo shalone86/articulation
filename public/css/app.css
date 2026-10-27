@@ -167,7 +167,52 @@ a.tag:hover { color: var(--accent); }
 .rec.recording { animation: pulse 1.2s infinite; }
 @keyframes pulse { 50% { filter: brightness(1.15); } }
 .status { text-align: center; color: var(--muted); min-height: 1.5em; }
-.flip-btn { align-self: center; margin-top: auto; }
+/* The flip is the core of the method, so it is always the biggest, brightest button on the card. */
+.flip-btn {
+  align-self: stretch; margin-top: auto; position: sticky; bottom: 0; justify-content: center;
+  font-size: 1.15rem; font-weight: 700; padding: 14px 18px; border-radius: 16px;
+  background: var(--accent); color: var(--accent-ink); border: 2px solid var(--accent);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.flip-btn:hover { background: var(--accent); filter: brightness(1.1); }
+.flip-btn.nudge { animation: nudge 1.4s ease-in-out 3; }
+@keyframes nudge {
+  50% { transform: scale(1.03); box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 28%, transparent); }
+}
+
+/* ── what you've already done ── */
+.history { text-align: center; margin: 0; color: var(--muted); font-size: 0.9rem; }
+.chip.won { border-color: var(--good); }
+.chip.tried { border-style: dashed; }
+.chip .mk { font-size: 0.8em; }
+.chip:not(.on).won .mk { color: var(--good); }
+.deck-progress { height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; margin: 10px 0 2px; }
+.deck-progress > div { height: 100%; background: var(--good); transition: width 0.4s; }
+.actions.start { justify-content: flex-start; margin: 8px 0; }
+.mini-card.mastered { border-color: var(--good); background: var(--good-soft); }
+.mini-card.learning { border-color: var(--accent); }
+.mini-card.tried { border-style: dashed; }
+.mini-card .badge { font-size: 0.75rem; font-weight: 700; color: var(--muted); }
+.mini-card.mastered .badge { color: var(--good); }
+
+/* ── celebration ── */
+.win { animation: win-glow 0.9s ease-out; }
+@keyframes win-glow {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 60%, transparent), var(--shadow); }
+  100% { box-shadow: 0 0 0 30px transparent, var(--shadow); }
+}
+.feedback.good { animation: pop 0.45s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes pop { 0% { transform: scale(0.85); opacity: 0.4; } 100% { transform: scale(1); opacity: 1; } }
+.confetti { position: fixed; width: 0; height: 0; pointer-events: none; z-index: 60; }
+.confetti i { position: absolute; width: 9px; height: 14px; border-radius: 2px; animation: confetti 1.1s cubic-bezier(.2, .7, .3, 1) forwards; }
+@keyframes confetti {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translate(var(--dx), calc(var(--dy) + 140px)) rotate(var(--rot)); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .win, .feedback.good, .flip-btn.nudge { animation: none; }
+}
 .actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 .feedback { border-radius: 14px; padding: 10px 14px; }
 .feedback p { margin: 0.3em 0; }
