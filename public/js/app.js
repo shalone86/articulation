@@ -720,6 +720,8 @@ function viewProgress() {
 async function viewSettings() {
   const s = store.settings();
   const voices = browserVoices();
+  const serverVoices = (await health()).voices?.length ? (await health()).voices
+    : ["asteria", "luna", "stella", "athena", "hera", "orion", "arcas", "perseus", "angus", "orpheus", "helios", "zeus"];
   render(`
     <nav class="crumbs"><a href="#/">Home</a> › Settings</nav>
     <h1>⚙️ Settings</h1>
@@ -740,11 +742,11 @@ async function viewSettings() {
         <label>Voice source
           <select id="ttsSource">
             <option value="auto" ${s.ttsSource === "auto" ? "selected" : ""}>Automatic (server voice if available)</option>
-            <option value="server" ${s.ttsSource === "server" ? "selected" : ""}>Server voice (Deepgram Aura)</option>
+            <option value="server" ${s.ttsSource === "server" ? "selected" : ""}>Server voice</option>
             <option value="browser" ${s.ttsSource === "browser" ? "selected" : ""}>This device’s built-in voice</option>
           </select></label>
         <label>Server voice
-          <select id="serverVoice">${["asteria", "luna", "stella", "athena", "hera", "orion", "arcas", "perseus", "angus", "orpheus", "helios", "zeus"]
+          <select id="serverVoice">${serverVoices
             .map((v) => `<option ${v === s.serverVoice ? "selected" : ""}>${v}</option>`).join("")}</select></label>
         <label>Device voice
           <select id="voice"><option value="">Automatic</option>${voices.map((v) => `<option ${v.name === s.voice ? "selected" : ""} value="${esc(v.name)}">${esc(v.name)} (${esc(v.lang)})</option>`).join("")}</select></label>
