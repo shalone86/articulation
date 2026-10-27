@@ -1,0 +1,18 @@
+# Self-hosted option: `docker compose up -d`, then open http://<server>:8000
+services:
+  articulation:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      WHISPER_MODEL: small.en        # base.en is ~2x faster; medium.en is more accurate but slow on CPU
+      PIPER_VOICE: en_US-lessac-medium   # local voice for the "listen" side; remove to use the browser's voice
+      PIPER_DIR: /models/piper
+      # APP_PASSCODE: change-me      # uncomment to require a passcode
+    volumes:
+      - whisper-models:/models       # keeps the downloaded model between restarts
+    restart: unless-stopped
+volumes:
+  whisper-models:

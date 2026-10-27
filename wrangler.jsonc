@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "articulation",
+  "main": "worker/index.js",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "ai": { "binding": "AI" },
+  "observability": { "enabled": true }
+  // Optional: require a passcode for the API (keeps strangers off your Workers AI quota):
+  //   npx wrangler secret put APP_PASSCODE
+  //
+  // Optional hybrid: run speech checks on your own server (better word scoring):
+  // "vars": { "STT_ORIGIN": "https://whisper.example.com" }
+  // and, if that server has a passcode:  npx wrangler secret put STT_PASSCODE
+}
