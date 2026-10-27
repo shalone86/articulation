@@ -39,9 +39,10 @@ The decision rule (in `public/js/score.js` → `refineWithScores`):
 
 I tuned it on real recordings with base.en, testing correct words, wrong words, and a true minimal pair:
 
-- Correct words: 37/40 accepted (open transcription alone: 36/40).
-- Wrong words: **0/40** accepted.
-- Real "no" recordings checked against target "go": **0/10** accepted.
+| Model | Correct words accepted | Wrong words accepted | Real "no" accepted as "go" |
+|---|---|---|---|
+| base.en | 37/40 (open alone: 36/40) | **0/40** | **0/10** |
+| small.en (Docker default) | **38/40** | **0/40** | **0/10** |
 
 On top of that, `score.js` recognizes common ESL patterns in what was heard and explains them in plain words:
 
