@@ -558,7 +558,6 @@ function viewPairs() {
   render(`
     <nav class="crumbs"><a href="#/">Home</a> › Minimal pairs</nav>
     <h1>👂 Minimal pairs</h1>
-    <p class="muted small">Two words, one sound different. <b>Listen</b> mode trains your ear; <b>Say</b> mode checks whether the speech checker hears the word you meant.</p>
     <div class="controls">
       <div class="seg" role="group">
         <button class="${ps.mode === "listen" ? "on" : ""}" data-mode="listen">👂 Listen</button>
@@ -711,7 +710,8 @@ function homophoneQuiz() {
   el.querySelectorAll("[data-h]").forEach((b) => (b.onclick = () => {
     const ok = b.dataset.h === word;
     b.classList.add(ok ? "right" : "wrong");
-    (ok ? b : el.querySelector(`[data-h="${CSS.escape(word)}"]`))?.classList.add("right", "trace");
+    if (ok) celebrate(b);
+    else el.querySelector(`[data-h="${CSS.escape(word)}"]`)?.classList.add("right");
     document.getElementById("h-fb").innerHTML = `<p>${ok ? "✅ Yes!" : `❌ It’s “${esc(word)}”.`}</p><button class="btn primary" id="h-next">Next →</button>`;
     const next = document.getElementById("h-next");
     next.onclick = homophoneQuiz;

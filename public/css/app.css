@@ -311,15 +311,8 @@ body.kid .notes, body.kid .keys { display: none; }
 .bottom-bar .bar-act { font-size: 1.4rem; }
 .bottom-bar .bar-act.recording { animation: pulse 1.2s infinite; background: var(--rec); }
 
-/* Homophones: a green line traces around the right answer. */
-@property --trace { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
-.choice.trace { position: relative; }
-.choice.trace::after {
-  content: ""; position: absolute; inset: -5px; border-radius: inherit; padding: 3px; pointer-events: none;
-  background: conic-gradient(var(--good) var(--trace), transparent 0);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
-  animation: trace 0.7s ease-out forwards;
+/* On phones the practice words scroll sideways in one row, so they stay on the first screen. */
+@media (max-width: 640px) {
+  .targets { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; padding-bottom: 4px; scrollbar-width: none; }
+  .targets .chip { flex: none; }
 }
-@keyframes trace { to { --trace: 360deg; } }
-@media (prefers-reduced-motion: reduce) { .choice.trace::after { animation: none; --trace: 360deg; } }
