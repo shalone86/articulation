@@ -178,7 +178,7 @@ function viewCard(deckId, index) {
       <div class="face front" id="front"></div>
       <div class="face back" id="back"></div>
     </div></div>
-    <p class="muted center keys">Keys: <kbd>space</kbd> record · <kbd>F</kbd> flip · <kbd>←</kbd> <kbd>→</kbd> cards · or swipe the card</p>
+    <p class="muted center keys">Keys: <kbd>space</kbd> record · <kbd>F</kbd> flip · <kbd>←</kbd> <kbd>→</kbd> cards</p>
     <div class="bottom-bar">
       <a class="btn bar-nav" id="prev-card" href="#/card/${deck.id}/${prev}" aria-label="Previous card">◀</a>
       <button class="btn bar-nav bar-act" id="bar-act"></button>
@@ -188,19 +188,6 @@ function viewCard(deckId, index) {
   `);
   renderFront();
   renderBack();
-  swipeable(document.getElementById("scene"));
-}
-
-/** Swipe the card left/right to go to the next/previous card. */
-function swipeable(el) {
-  let x0, y0;
-  el.addEventListener("touchstart", (e) => { [x0, y0] = [e.touches[0].clientX, e.touches[0].clientY]; }, { passive: true });
-  el.addEventListener("touchend", (e) => {
-    if (x0 == null) return;
-    const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
-    x0 = null;
-    if (Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy)) document.getElementById(dx < 0 ? "next-card" : "prev-card")?.click();
-  });
 }
 
 /** The flip button lives outside the card, pinned to the bottom of the screen, so it never scrolls away. */
