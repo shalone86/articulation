@@ -174,19 +174,32 @@ function viewCard(deckId, index) {
   const next = (index + 1) % cards.length;
   render(`
     <nav class="crumbs"><a href="#/">Home</a> › <a href="#/deck/${deck.id}">${esc(deck.name)}</a> › ${index + 1} / ${cards.length}</nav>
-    <div class="card-nav">
-      <a class="btn" href="#/card/${deck.id}/${prev}" aria-label="Previous card">◀</a>
-      <div class="flip-scene"><div class="flip" id="flip">
-        <div class="face front" id="front"></div>
-        <div class="face back" id="back"></div>
-      </div></div>
-      <a class="btn" href="#/card/${deck.id}/${next}" aria-label="Next card">▶</a>
+    <div class="flip-scene" id="scene"><div class="flip" id="flip">
+      <div class="face front" id="front"></div>
+      <div class="face back" id="back"></div>
+    </div></div>
+    <p class="muted center keys">Keys: <kbd>space</kbd> record · <kbd>F</kbd> flip · <kbd>←</kbd> <kbd>→</kbd> cards · or swipe the card</p>
+    <div class="bottom-bar">
+      <a class="btn bar-nav" id="prev-card" href="#/card/${deck.id}/${prev}" aria-label="Previous card">◀</a>
+      <button class="btn flip-btn" id="flip-btn" data-flip></button>
+      <a class="btn bar-nav" id="next-card" href="#/card/${deck.id}/${next}" aria-label="Next card">▶</a>
     </div>
-    <p class="muted center keys">Keys: <kbd>space</kbd> record · <kbd>F</kbd> flip · <kbd>←</kbd> <kbd>→</kbd> cards</p>
-    <div class="flip-bar"><button class="btn flip-btn" id="flip-btn" data-flip></button></div>
   `);
   renderFront();
   renderBack();
+  swipeable(document.getElementById("scene"));
+}
+
+/** Swipe the card left/right to go to the next/previous card. */
+function swipeable(el) {
+  let x0, y0;
+  el.addEventListener("touchstart", (e) => { [x0, y0] = [e.touches[0].clientX, e.touches[0].clientY]; }, { passive: true });
+  el.addEventListener("touchend", (e) => {
+    if (x0 == null) return;
+    const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+    x0 = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy)) document.getElementById(dx < 0 ? "next-card" : "prev-card")?.click();
+  });
 }
 
 /** The flip button lives outside the card, pinned to the bottom of the screen, so it never scrolls away. */
@@ -221,13 +234,13 @@ function renderFront() {
     <div class="glyph">${c.emoji ? `<span class="emoji">${c.emoji}</span>` : ""}<b>${esc(c.big)}</b>${ipa(c.ipa)}</div>
     <div class="tags">${tags}</div>
     <p class="say-this">Say: <strong class="${cs.isSentence ? "sentence-text" : "word-text"}">${esc(target)}</strong></p>
-    ${targetPicker()}
-    ${historyHtml()}
     <div class="rec-row">
       <button class="rec" id="rec" aria-label="Record">${recorder.state === "recording" ? "⏹" : "🎤"}</button>
     </div>
     <div class="status" id="status">${micSupported() ? "Tap the microphone and say it." : "This browser can’t record audio. You can still flip the card to listen."}</div>
     <div id="result" aria-live="polite">${resultHtml()}</div>
+    ${targetPicker()}
+    ${historyHtml()}
   `;
   updateFlipBtn();
 }
@@ -466,8 +479,8 @@ document.addEventListener("keydown", (e) => {
   if (!document.getElementById("flip") || e.target.closest("input, select, textarea")) return;
   if (e.code === "Space") { e.preventDefault(); toggleRecord(); }
   else if (e.key === "f" || e.key === "F") flip();
-  else if (e.key === "ArrowRight") document.querySelector('.card-nav a:last-child')?.click();
-  else if (e.key === "ArrowLeft") document.querySelector('.card-nav a:first-child')?.click();
+  else if (e.key === "ArrowRight") document.getElementById("next-card")?.click();
+  else if (e.key === "ArrowLeft") document.getElementById("prev-card")?.click();
 });
 
 // ───────────────────────── learn ─────────────────────────
@@ -541,9 +554,11 @@ function viewPairs() {
         <button class="${ps.mode === "say" ? "on" : ""}" data-mode="say">🎤 Say</button>
       </div>
       <select id="pair-filter" aria-label="Sound">${opts.map(([v, n]) => `<option value="${v}" ${v === ps.filter ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>
-      <span class="muted small">Score: ${st.wins} / ${st.tries}</span>
+      <span class="muted small" id="pair-score">Score: ${st.wins} / ${st.tries}</span>
     </div>
-    <div class="game" id="game"></div>`);
+    <div class="game" id="game"></div>
+    <div class="bottom-bar"><button class="btn flip-btn" id="next-pair">Skip →</button></div>`);
+  document.getElementById("next-pair").onclick = nextPair;
   document.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = () => { ps.mode = b.dataset.mode; viewPairs(); }));
   document.getElementById("pair-filter").onchange = (e) => { ps.filter = e.target.value; nextPair(); };
   nextPair();
@@ -556,7 +571,18 @@ function pairPool() {
   return ALL_PAIRS.filter((p) => p.sound === ps.filter);
 }
 
+/** After an answer: refresh the score and turn Skip into Next (it sits in the bottom bar, always reachable). */
+function pairAnswered() {
+  const st = store.pairStats();
+  document.getElementById("pair-score").textContent = `Score: ${st.wins} / ${st.tries}`;
+  const b = document.getElementById("next-pair");
+  b.textContent = "Next →";
+  b.classList.add("nudge");
+}
+
 function nextPair() {
+  const nb = document.getElementById("next-pair");
+  if (nb) { nb.textContent = "Skip →"; nb.classList.remove("nudge"); }
   const pool = pairPool();
   const game = document.getElementById("game");
   if (!pool.length) return (game.innerHTML = `<p class="muted">No pairs for this choice.</p>`);
@@ -585,9 +611,8 @@ function nextPair() {
         <div class="feedback ${ok ? "good" : "warn"}">
           <p><b>${ok ? "✅ Right!" : `❌ It was “${esc(target)}”.`}</b> Listen to both: ${pairBtns([pair.a, pair.b])}</p>
           <p class="muted small">Sound: <a href="#/c/s-${p.id}">${esc(p.label)} ${ipa(p.ipa)}</a></p>
-        </div>
-        <button class="btn primary" id="next-pair">Next →</button>`;
-      document.getElementById("next-pair").onclick = nextPair;
+        </div>`;
+      pairAnswered();
     }));
   } else {
     game.innerHTML = `
@@ -620,13 +645,13 @@ function nextPair() {
           }</b></p>${!ok ? `<p class="tip">💡 ${esc(p.how)}</p>` : ""}</div>
           <button class="btn" id="mine">▶ My try</button>`;
         }
-        fb.innerHTML = html + `<button class="btn primary" id="next-pair">Next →</button>`;
+        fb.innerHTML = html;
+        pairAnswered();
         if (won) celebrate(document.getElementById("game"));
         document.getElementById("mine")?.addEventListener("click", () => playUrl(take.url));
-        document.getElementById("next-pair").onclick = nextPair;
       } catch (e) {
-        fb.innerHTML = `<div class="feedback warn"><p>${esc(e.message)}</p></div><button class="btn primary" id="next-pair">Next →</button>`;
-        document.getElementById("next-pair").onclick = nextPair;
+        fb.innerHTML = `<div class="feedback warn"><p>${esc(e.message)}</p></div>`;
+        pairAnswered();
       }
       btn.textContent = "🎤";
     };
@@ -676,7 +701,9 @@ function homophoneQuiz() {
     const ok = b.dataset.h === word;
     b.classList.add(ok ? "right" : "wrong");
     document.getElementById("h-fb").innerHTML = `<p>${ok ? "✅ Yes!" : `❌ It’s “${esc(word)}”.`}</p><button class="btn primary" id="h-next">Next →</button>`;
-    document.getElementById("h-next").onclick = homophoneQuiz;
+    const next = document.getElementById("h-next");
+    next.onclick = homophoneQuiz;
+    next.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }));
 }
 
