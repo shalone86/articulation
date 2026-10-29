@@ -181,6 +181,7 @@ function viewCard(deckId, index) {
     <p class="muted center keys">Keys: <kbd>space</kbd> record · <kbd>F</kbd> flip · <kbd>←</kbd> <kbd>→</kbd> cards · or swipe the card</p>
     <div class="bottom-bar">
       <a class="btn bar-nav" id="prev-card" href="#/card/${deck.id}/${prev}" aria-label="Previous card">◀</a>
+      <button class="btn bar-nav bar-act" id="bar-act"></button>
       <button class="btn flip-btn" id="flip-btn" data-flip></button>
       <a class="btn bar-nav" id="next-card" href="#/card/${deck.id}/${next}" aria-label="Next card">▶</a>
     </div>
@@ -206,8 +207,15 @@ function swipeable(el) {
 function updateFlipBtn() {
   const b = document.getElementById("flip-btn");
   if (!b) return;
-  b.textContent = cs.flipped ? "🎤 Flip back to try it" : cs.take ? "👂 Now flip it: hear it said right" : "👂 Flip to listen";
+  b.textContent = "↻ Flip";
+  b.setAttribute("aria-label", cs.flipped ? "Flip back to try it" : "Flip to listen");
   b.classList.toggle("nudge", !cs.flipped && !!cs.take);
+  // Same job as the big button on the visible side: record on the front, listen on the back.
+  const a = document.getElementById("bar-act");
+  const rec = recorder.state === "recording";
+  a.textContent = cs.flipped ? "👂" : rec ? "⏹" : cs.busy ? "⏳" : "🔴";
+  a.setAttribute("aria-label", cs.flipped ? "Listen" : rec ? "Stop recording" : "Record");
+  a.classList.toggle("recording", !cs.flipped && rec);
 }
 
 function targetPicker() {
@@ -403,6 +411,7 @@ async function toggleRecord() {
     });
     btn.classList.add("recording");
     btn.textContent = "⏹";
+    updateFlipBtn();
     status.textContent = "Listening… (it stops by itself when you finish)";
   } catch (e) {
     status.textContent = e.message;
@@ -419,6 +428,7 @@ async function finishRecording() {
   const btn = document.getElementById("rec");
   btn.classList.remove("recording");
   btn.textContent = "⏳";
+  updateFlipBtn();
   try {
     const take = await recorder.stop();
     if (cs.card !== myCard) return;
@@ -458,6 +468,7 @@ $app.addEventListener("click", async (e) => {
   const t = e.target.closest("button");
   if (!t) return;
   if (t.id === "rec") return toggleRecord();
+  if (t.id === "bar-act") return cs.flipped ? speak(cs.target) : toggleRecord();
   if (t.hasAttribute("data-flip")) return flip();
   if (t.dataset.target) {
     cs.isSentence = t.dataset.target === "__sentence";
@@ -547,7 +558,7 @@ function viewPairs() {
   render(`
     <nav class="crumbs"><a href="#/">Home</a> › Minimal pairs</nav>
     <h1>👂 Minimal pairs</h1>
-    <p class="muted">Two words, one sound different. <b>Listen</b> mode trains your ear; <b>Say</b> mode checks whether the speech checker hears the word you meant.</p>
+    <p class="muted small">Two words, one sound different. <b>Listen</b> mode trains your ear; <b>Say</b> mode checks whether the speech checker hears the word you meant.</p>
     <div class="controls">
       <div class="seg" role="group">
         <button class="${ps.mode === "listen" ? "on" : ""}" data-mode="listen">👂 Listen</button>
@@ -700,6 +711,7 @@ function homophoneQuiz() {
   el.querySelectorAll("[data-h]").forEach((b) => (b.onclick = () => {
     const ok = b.dataset.h === word;
     b.classList.add(ok ? "right" : "wrong");
+    (ok ? b : el.querySelector(`[data-h="${CSS.escape(word)}"]`))?.classList.add("right", "trace");
     document.getElementById("h-fb").innerHTML = `<p>${ok ? "✅ Yes!" : `❌ It’s “${esc(word)}”.`}</p><button class="btn primary" id="h-next">Next →</button>`;
     const next = document.getElementById("h-next");
     next.onclick = homophoneQuiz;
