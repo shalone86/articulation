@@ -84,7 +84,7 @@ async function viewHome() {
   const groups = [...new Set(DECKS.map((d) => d.group))];
   render(`
     <section class="hero">
-      <h1>Hi, ${esc(store.currentLearner())}! 👋</h1>
+      <h1>${store.currentLearner() === "Me" ? "Hi!" : `Hi, ${esc(store.currentLearner())}!`} 👋</h1>
       <p>Pick a deck. On each card, <b>🎤 record your try</b>, then <b>flip it 👂 to hear it said</b> the right way.</p>
       <div id="backend" class="backend muted">Checking speech checker…</div>
     </section>
@@ -754,7 +754,7 @@ function viewProgress() {
     }).join("");
   render(`
     <nav class="crumbs"><a href="#/">Home</a> › Progress</nav>
-    <h1>⭐ ${esc(store.currentLearner())}’s progress</h1>
+    <h1>⭐ ${store.currentLearner() === "Me" ? "Your progress" : `${esc(store.currentLearner())}’s progress`}</h1>
     <div class="stats">
       <div><b>${tried.length}</b><small>cards practiced</small></div>
       <div><b>${total ? Math.round((wins / total) * 100) : 0}%</b><small>tries matched</small></div>
