@@ -15,11 +15,15 @@ root="$(cd "$(dirname "$0")/../.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-# Create the Space (ignore "already exists").
-curl -fsS -X POST https://huggingface.co/api/repos/create \
+# Create the Space (409 = already exists).
+status=$(curl -sS -o "$work/create.json" -w '%{http_code}' -X POST https://huggingface.co/api/repos/create \
   -H "Authorization: Bearer $HF_TOKEN" -H "Content-Type: application/json" \
-  -d "{\"type\":\"space\",\"name\":\"$space\",\"sdk\":\"docker\",\"private\":${HF_PRIVATE:-false}}" >/dev/null \
-  || echo "(Space probably exists already — continuing)"
+  -d "{\"type\":\"space\",\"name\":\"$space\",\"sdk\":\"docker\",\"private\":${HF_PRIVATE:-false}}")
+case "$status" in
+  2??) echo "Created Space $user/$space" ;;
+  409) echo "Space $user/$space exists — updating it" ;;
+  *) echo "Creating the Space failed (HTTP $status): $(cat "$work/create.json")" >&2; exit 1 ;;
+esac
 
 git clone -q "https://user:$HF_TOKEN@huggingface.co/spaces/$user/$space" "$work/space"
 cd "$work/space"

@@ -2,7 +2,15 @@
 
 Goal: the app keeps working when the home internet (or the home server) is down, for $0.
 
-## Recommended: Cloudflare Workers + a free Hugging Face Space
+## Live setup (October 2026)
+
+**Cloudflare Worker only:** https://articulation.ariyandhamma.workers.dev — the site, the server voice (Workers AI Aura) and the speech check (Workers AI Whisper). No `STT_ORIGIN` is set.
+
+The Hugging Face Space below is **no longer free**: since 2026, Hugging Face requires a PRO subscription (~$9/month) to host Docker or Gradio Spaces on the free CPU (`deploy.sh` stops with HTTP 402). Only static Spaces stay free, and those can't run `server/`. If you subscribe later, follow step 1 below and add `STT_ORIGIN` to `wrangler.jsonc` — the Worker then uses the Space and falls back to Workers AI by itself.
+
+To update: `git pull`, then `npx wrangler deploy`.
+
+## Original plan: Cloudflare Workers + a Hugging Face Space
 
 ```
  phone / browser ──► Cloudflare Worker (free)  ── site, voice (Aura), Android verification
@@ -15,7 +23,7 @@ Goal: the app keeps working when the home internet (or the home server) is down,
 | Piece | Free? | What it does |
 |---|---|---|
 | **Cloudflare Workers** | Free plan; Workers AI has a free daily allowance that 1–2 learners won't come near | Serves the app worldwide over HTTPS, the server voice (cached), and a speech check that always answers |
-| **Hugging Face Space** (CPU basic: 2 vCPU, 16 GB RAM) | Free | Runs `server/` — faster-whisper `small.en` + the Kokoro voice — for the better forced-choice scoring. It's also a full working copy of the app on its own URL. |
+| **Hugging Face Space** (CPU basic: 2 vCPU, 16 GB RAM) | Needs HF PRO for Docker Spaces | Runs `server/` — faster-whisper `small.en` + the Kokoro voice — for the better forced-choice scoring. It's also a full working copy of the app on its own URL. |
 
 Nothing runs at your house. If the Space is asleep or broken, checks quietly fall back to Workers AI (open transcription, ~90% vs ~95% on the benchmark in WORKSHOP.md); the next check after it wakes uses the Space again.
 
@@ -63,7 +71,7 @@ Custom domain: Cloudflare dashboard → Workers → articulation → Settings �
 | Option | Cost | Why not the default |
 |---|---|---|
 | Only Cloudflare Workers | Free | Works fine alone (that's the fallback); just without forced-choice scoring. Perfectly good if you want one thing to manage. |
-| Only the Hugging Face Space | Free | Simplest of all, but sleeps after 48 h idle and there's no edge cache or fallback. |
+| Only the Hugging Face Space | HF PRO | Simplest of all, but sleeps after 48 h idle and there's no edge cache or fallback. |
 | Oracle Cloud "Always Free" ARM VM (4 cores, 24 GB) | Free | Always-on and powerful, but signup needs a card, idle VMs can be reclaimed, and you're back to running a server. |
 | Google Cloud Run / Fly.io | Low, not zero | Cold starts load the Whisper model each time; billing to watch. |
 | Vercel / Netlify | Free for the site | Can't run Whisper; you'd pay a transcription API. |
