@@ -99,6 +99,17 @@ export function wordStatus(cardId, word) {
   return !w ? "new" : w[1] > 0 ? "won" : "tried";
 }
 
+/** Latest sentence checkup for this learner: { at, suggested, sounds, patterns, clear, total }. */
+export const checkup = () => mine().checkup ?? null;
+export function setCheckup(result) {
+  const { suggested, sounds, patterns, clear, total } = result;
+  mine().checkup = { at: Date.now(), suggested, sounds: sounds.slice(0, 10), patterns, clear, total };
+  save();
+}
+/** The learner chose "maybe later" on the welcome checkup. */
+export const checkupSkipped = () => !!mine().checkupSkipped;
+export function skipCheckup() { mine().checkupSkipped = true; save(); }
+
 export function recordPair(success) {
   const p = mine().pairs;
   p.tries++;

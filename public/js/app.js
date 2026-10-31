@@ -10,6 +10,7 @@ import { scoreWord, scoreSentence, isSuccess, candidatesFor, refineWithScores, n
 import { speak, playUrl, stop as stopAudio, browserVoices, prefetch } from "./tts.js";
 import { health, transcribe } from "./api.js";
 import { search, cardsForWord, patternsIn } from "./search.js";
+import { CHECKUP_SENTENCES, analyzeCheckup } from "./checkup.js";
 import * as store from "./store.js";
 
 const $app = document.getElementById("app");
@@ -22,6 +23,8 @@ const say = (text, label = text, cls = "") =>
 const pairBtns = ([a, b]) => `<span class="pair">${say(a)}<span class="vs">vs</span>${say(b)}</span>`;
 const stars = (n) => `<span class="stars" aria-label="${n} of 3 stars">${"★".repeat(n)}<span class="off">${"★".repeat(3 - n)}</span></span>`;
 const CAT_NAMES = { plosive: "Plosive", fricative: "Fricative", affricate: "Affricate", nasal: "Nasal", liquid: "Liquid / glide", vowel: "Vowel", rvowel: "R-controlled vowel", spelling: "Spelling" };
+/** Short label for small badges: "th (quiet)" → "th". */
+const shortLabel = (c) => c.big.replace(/ \(.*\)$/, "").replace(/ \/.*$/, "");
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const recorder = new Recorder();
@@ -37,7 +40,7 @@ export const LOOKS = {
     fonts: "family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600",
   },
   pop: {
-    name: "Pop", blurb: "Bold stickers and thick outlines — loud and fun.",
+    name: "Pop", blurb: "Bold outlines and sticker shapes in soft, chalky colors.",
     fonts: "family=Archivo+Black&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700",
   },
 };
@@ -77,6 +80,7 @@ const routes = [
   [/^progress$/, viewProgress],
   [/^settings$/, viewSettings],
   [/^install$/, viewInstall],
+  [/^checkup$/, viewCheckup],
 ];
 
 let query = new URLSearchParams();
@@ -175,7 +179,20 @@ async function viewHome() {
   const last = store.lastCard();
   const lastCard = last && cardById[last.card];
   const groups = [...new Set(DECKS.map((d) => d.group))];
+  const ck = store.checkup();
+  const isNew = !ck && !store.checkupSkipped() && !Object.keys(store.allCardProgress()).length;
   render(`
+    ${isNew ? `<section class="welcome" data-cat="rvowel">
+      <div class="welcome-art" aria-hidden="true">🎤📝</div>
+      <div>
+        <h1>Welcome! Let’s find your practice sounds.</h1>
+        <p>Read ${CHECKUP_SENTENCES.length} short sentences out loud (about 2 minutes). I’ll listen and suggest which sounds to start with.</p>
+        <div class="actions start">
+          <a class="btn primary big-btn" href="#/checkup">▶ Start the checkup</a>
+          <button class="btn" id="skip-checkup">Maybe later</button>
+        </div>
+      </div>
+    </section>` : ""}
     <section class="hero">
       <div class="hero-text">
         <h1>${store.currentLearner() === "Me" ? "Hi!" : `Hi, ${esc(store.currentLearner())}!`} <span class="wave" aria-hidden="true">👋</span></h1>
@@ -186,7 +203,8 @@ async function viewHome() {
         <input name="q" type="search" placeholder="Find a word or sound — “thumb”, “igh”, “schwa”…" autocomplete="off" aria-label="Search words and sounds">
       </form>
       ${lastCard ? `<a class="continue" data-cat="${lastCard.cat}" href="#/card/${last.deck}/${lastCard.id}">
-        <span class="mini-glyph">${esc(lastCard.big)}</span><span><small>Continue</small><b>${esc(deckById[last.deck]?.name ?? "")}</b></span><span aria-hidden="true">→</span></a>` : ""}
+        <span class="mini-glyph">${esc(shortLabel(lastCard))}</span><span><small>Continue</small><b>${esc(deckById[last.deck]?.name ?? "")}</b></span><span aria-hidden="true">→</span></a>` : ""}
+      ${ck ? planHtml(ck) : !isNew ? `<a class="checkup-link" href="#/checkup">🩺 Not sure where to start? Take the 2-minute sentence checkup →</a>` : ""}
       <div id="backend" class="backend muted small">Checking speech checker…</div>
     </section>
     <section class="tiles">
@@ -215,6 +233,7 @@ async function viewHome() {
         }).join("")}
       </div>`).join("")}
   `);
+  document.getElementById("skip-checkup")?.addEventListener("click", () => { store.skipCheckup(); viewHome(); });
   document.getElementById("home-search").addEventListener("submit", (e) => {
     e.preventDefault();
     location.hash = `#/search?q=${encodeURIComponent(e.target.q.value.trim())}`;
@@ -1073,6 +1092,167 @@ async function showHealth(force) {
   if (el) el.innerHTML = h.stt
     ? `✅ Connected: <b>${esc(h.backend)}</b> · ${esc(h.model)}${h.tts ? " · server voice on" : ""}`
     : `⚠️ Not connected. ${esc(h.error ?? "")}`;
+}
+
+// ───────────────────────── sentence checkup ─────────────────────────
+/** "Your practice plan" box: the checkup's suggested sounds and word-pattern lessons. */
+function planHtml(ck) {
+  const cards = ck.suggested.map((id) => cardById[`s-${id}`]).filter(Boolean);
+  return `<div class="plan">
+    <div class="plan-head"><b>🩺 Your practice plan</b><a class="small" href="#/checkup">Retake checkup</a></div>
+    ${cards.length ? `<div class="plan-cards">${cards.map((c) =>
+      `<a class="chip" data-cat="${c.cat}" href="#/card/checkup/${c.id}">${esc(c.big)}${c.ipa && store.settings().showIpa ? ` <span class="ipa">/${esc(c.ipa)}/</span>` : ""}</a>`).join("")}
+      ${ck.patterns.slice(0, 2).map((p) => `<a class="chip" href="#/learn/${p.lesson}">📘 ${esc(p.name)}</a>`).join("")}</div>`
+    : `<p class="small muted">Your checkup came through clearly — try the <a href="#/pairs">minimal pairs game</a> or the vowels.</p>`}
+  </div>`;
+}
+
+let ck; // checkup state: { step: "intro" | number | "results", takes: [], take?, result? }
+
+function viewCheckup() {
+  ck = { step: "intro", takes: [] };
+  renderCheckup();
+}
+
+async function renderCheckup() {
+  const n = CHECKUP_SENTENCES.length;
+  if (ck.step === "intro") {
+    const h = await health();
+    const lang = store.settings().language;
+    render(`
+      <nav class="crumbs"><a href="#/">Home</a> › Checkup</nav>
+      <div class="checkup">
+        <h1>🩺 Find your practice sounds</h1>
+        <p>You’ll read ${n} short sentences out loud. Each one hides a few tricky sounds. Afterwards you’ll see which sounds to practice first.</p>
+        <ul class="checkup-tips">
+          <li>Read at your <b>normal speed</b>, like talking to a friend.</li>
+          <li>Find a quiet spot. Hold the phone about a hand’s width from your mouth.</li>
+          <li>Young readers: a grown-up can read each sentence first, or tap <b>🔊 Hear it</b>.</li>
+        </ul>
+        <label class="lang-pick">First language <span class="muted small">(optional — adds tips made for you)</span>
+          <select id="ck-lang"><option value="">English / not set</option>${LANGUAGES.map((l) => `<option value="${l.id}" ${l.id === lang ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select>
+        </label>
+        ${h.stt ? "" : `<p class="feedback warn">The speech checker isn’t reachable right now, so the checkup can’t listen. Check your connection and try again.</p>`}
+        <div class="actions start">
+          <button class="btn primary big-btn" id="ck-start" ${h.stt && micSupported() ? "" : "disabled"}>▶ Start</button>
+          <a class="btn" href="#/">Not now</a>
+        </div>
+        <p class="muted small">This is a quick screen to pick practice sounds, not a diagnosis. The speech checker fills in from context, so it can miss small mistakes.</p>
+      </div>`);
+    document.getElementById("ck-lang").onchange = (e) => store.setSetting("language", e.target.value);
+    document.getElementById("ck-start").onclick = () => { ck.step = 0; renderCheckup(); };
+    return;
+  }
+  if (ck.step === "results") return renderCheckupResults();
+
+  const i = ck.step;
+  const s = CHECKUP_SENTENCES[i];
+  const t = ck.take;
+  render(`
+    <nav class="crumbs"><a href="#/">Home</a> › Checkup</nav>
+    <div class="checkup">
+      <div class="ck-progress" aria-label="Sentence ${i + 1} of ${n}">${CHECKUP_SENTENCES.map((_, k) =>
+        `<span class="${k < i ? "done" : k === i ? "now" : ""}"></span>`).join("")}</div>
+      <p class="muted small">Sentence ${i + 1} of ${n} · ${esc(s.focus)}</p>
+      <p class="ck-sentence">${t?.aligned ? t.aligned.map((w) =>
+        `<span class="${w.status}" ${w.heard ? `title="heard “${esc(w.heard)}”"` : ""}>${esc(w.word)}</span>`).join(" ") : esc(s.text)}</p>
+      ${t?.aligned ? `<p class="muted small">I heard: “${esc(t.text)}”</p>` : ""}
+      <button class="rec" id="ck-rec" aria-label="Record">${t ? "↻" : "🎤"}</button>
+      <p class="status" id="ck-status">${t ? "Happy with it? Go on — or tap to read it again." : "Tap the microphone and read the sentence."}</p>
+      <div class="actions">
+        <button class="btn" data-say="${esc(s.text)}">🔊 Hear it</button>
+        ${t ? `<button class="btn" id="ck-mine">▶ My reading</button>` : ""}
+      </div>
+    </div>
+    <div class="bottom-bar">
+      <button class="btn bar-nav" id="ck-skip">${t ? "" : "Skip"}</button>
+      <button class="btn flip-btn ${t ? "nudge" : ""}" id="ck-next" ${t ? "" : "disabled"}>${i + 1 < n ? "Next sentence →" : "See my results →"}</button>
+    </div>`);
+  const skip = document.getElementById("ck-skip");
+  if (t) skip.remove();
+  else skip.onclick = () => advanceCheckup();
+  document.getElementById("ck-next").onclick = () => advanceCheckup();
+  document.getElementById("ck-mine")?.addEventListener("click", () => playUrl(t.url).catch((e) => toast(`🔇 ${e.message}`)));
+  const btn = document.getElementById("ck-rec");
+  const status = document.getElementById("ck-status");
+  const finish = async () => {
+    if (recorder.state !== "recording") return;
+    btn.classList.remove("recording");
+    btn.textContent = "⏳";
+    status.textContent = "Listening back…";
+    const step = ck.step;
+    try {
+      const take = await recorder.stop();
+      if (ck.step !== step) return;
+      if (!take.speech) { status.textContent = "🙉 I didn’t hear anything. Tap and try again, a little louder."; btn.textContent = "🎤"; return; }
+      const { text, words } = await transcribe(take.wav);
+      if (ck.step !== step) return;
+      ck.take = { index: i, text, words, url: take.url, aligned: scoreSentence(s.text, text).words };
+    } catch (e) {
+      status.textContent = e.message;
+      btn.textContent = "🎤";
+      return;
+    }
+    renderCheckup();
+  };
+  btn.onclick = async () => {
+    if (recorder.state === "recording") return finish();
+    if (recorder.state !== "idle") return;
+    stopAudio();
+    try {
+      await recorder.start({ maxMs: 14000, silenceMs: 1800, onLevel: (l) => btn.style.setProperty("--level", l.toFixed(2)), onAutoStop: finish });
+      btn.classList.add("recording");
+      btn.textContent = "⏹";
+      status.textContent = "Listening… read the whole sentence. It stops when you finish.";
+    } catch (e) {
+      status.textContent = e.message;
+    }
+  };
+}
+
+function advanceCheckup() {
+  recorder.cancel();
+  if (ck.take) ck.takes.push(ck.take);
+  ck.take = null;
+  ck.step = ck.step + 1 < CHECKUP_SENTENCES.length ? ck.step + 1 : "results";
+  renderCheckup();
+}
+
+function renderCheckupResults() {
+  if (!ck.takes.length) {
+    render(`<div class="checkup empty"><p>No sentences were recorded, so there’s nothing to suggest yet.</p>
+      <a class="btn primary" href="#/checkup">Try again</a> <a class="btn" href="#/">Home</a></div>`);
+    return;
+  }
+  const r = (ck.result ??= analyzeCheckup(ck.takes));
+  store.setCheckup(r);
+  const suggested = r.suggested.map((id) => cardById[`s-${id}`]).filter(Boolean);
+  const reason = (id) => r.sounds.find((x) => x.id === id).examples.slice(0, 3).map((e) =>
+    e.status === "changed" ? `“${esc(e.word)}” sounded like “${esc(e.heard)}”` : e.status === "missed" ? `“${esc(e.word)}” didn’t come through` : `“${esc(e.word)}” was unclear`).join(" · ");
+  const pct = r.total ? Math.round((r.clear / r.total) * 100) : 0;
+  render(`
+    <nav class="crumbs"><a href="#/">Home</a> › Checkup</nav>
+    <div class="checkup">
+      <h1>${suggested.length ? "🎯 Here’s where to start" : "🎉 That came through clearly!"}</h1>
+      <p><b>${r.clear} of ${r.total}</b> key words came through clearly (${pct}%).</p>
+      ${ck.takes.length < 5 ? `<p class="callout small">You read ${ck.takes.length} of ${CHECKUP_SENTENCES.length} sentences, so this is based on just a few words. <a href="#/checkup">Read them all</a> for a better picture.</p>` : ""}
+      ${suggested.length ? `<h2>Practice these sounds first</h2>
+        <div class="ck-results">${suggested.map((c) => `
+          <a class="ck-result" data-cat="${c.cat}" href="#/card/checkup/${c.id}">
+            <span class="mini-glyph">${esc(shortLabel(c))}</span>
+            <span><b>${esc(c.p.label)} ${ipa(c.ipa)}</b><small>${reason(c.p.id)}</small></span>
+            <span aria-hidden="true">→</span>
+          </a>`).join("")}</div>`
+      : `<p>None of the test words stood out. Try the <a href="#/pairs">minimal pairs game</a> to train your ear, or practice the <a href="#/deck/vowels">vowels</a>.</p>`}
+      ${r.patterns.length ? `<h2>Habits to know about</h2><div class="ck-results">${r.patterns.map((p) => `
+        <a class="ck-result" href="#/learn/${p.lesson}"><span class="mini-glyph">📘</span>
+          <span><b>${esc(p.name)}</b><small>${p.examples.slice(0, 3).map(esc).join(" · ")}</small></span><span aria-hidden="true">→</span></a>`).join("")}</div>` : ""}
+      <div class="actions start">
+        ${suggested.length ? `<a class="btn primary big-btn" href="#/card/checkup/${suggested[0].id}">▶ Start practicing</a>` : ""}
+        <a class="btn" href="#/">Home</a>
+      </div>
+      <p class="muted small">Saved as “From my checkup” under <i>For you</i> on the home screen. Retake it any time to see how you’ve improved.</p>
+    </div>`);
 }
 
 // ───────────────────────── install (download) the app ─────────────────────────

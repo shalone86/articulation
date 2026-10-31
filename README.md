@@ -11,6 +11,7 @@ Pronunciation practice for English learners (ESL) and kids working on speech sou
 - **Spelling chart:** every common spelling of every sound. Tap one to hear it.
 - **Progress** for each learner (handy for 1–2 people sharing a device), stars, a "needs practice" deck, and a backup file you can export and import.
 
+- **Sentence checkup** on first use: read 9 short sentences, and the app suggests which sounds (and habits like dropping word endings) to practice first. Retake it any time.
 - **Search** for any word, spelling or sound ("thumb", "igh", "schwa", "θ"); any word not on a card gets its own practice card.
 - **Three looks** (Playroom, Studio, Pop) in Settings → Look, each with dark mode; swipe between cards; installable and works offline.
 

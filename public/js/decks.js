@@ -2,7 +2,7 @@
 
 import { PHONEMES, phonemeById, phonemeWords, MANNERS } from "./data/phonemes.js";
 import { GRAPHEMES, GRAPHEME_TYPES } from "./data/graphemes.js";
-import { settings, allCardProgress } from "./store.js";
+import { settings, allCardProgress, checkup } from "./store.js";
 import { languageName } from "./data/languages.js";
 
 /** Color family for a card: plosive | fricative | affricate | nasal | liquid | vowel | rvowel | spelling */
@@ -71,6 +71,13 @@ export const DECKS = [
   { id: "magic-e", name: "Magic e", emoji: "🪄", cat: "spelling", group: "Spellings", cards: spellings("split-digraph") },
   { id: "bossy-r", name: "Bossy R spellings", emoji: "🦖", cat: "spelling", group: "Spellings", cards: spellings("r-controlled") },
   { id: "silent", name: "Silent letters", emoji: "🤫", cat: "spelling", group: "Spellings", cards: spellings("silent") },
+  {
+    id: "checkup", name: "From my checkup", emoji: "🩺", cat: "rvowel", group: "For you",
+    describe: () => checkup()
+      ? "The sounds your sentence checkup suggested practicing first."
+      : "Take the 2-minute sentence checkup to fill this deck.",
+    cards: () => (checkup()?.suggested ?? []).map((id) => SOUND_CARDS.find((c) => c.p.id === id)).filter(Boolean),
+  },
   {
     id: "focus", name: "My focus sounds", emoji: "🎯", cat: "affricate", group: "For you",
     describe: () => settings().language

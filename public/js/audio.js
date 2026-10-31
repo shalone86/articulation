@@ -15,8 +15,9 @@ export class Recorder {
    * @param {(level:number)=>void} [o.onLevel]  0..1 loudness, ~30x per second
    * @param {()=>void} [o.onAutoStop]           called when silence after speech ends the take
    * @param {number} [o.maxMs]                  hard limit
+   * @param {number} [o.silenceMs]              how long a pause after speech ends the take
    */
-  async start({ onLevel, onAutoStop, maxMs = 6000 } = {}) {
+  async start({ onLevel, onAutoStop, maxMs = 6000, silenceMs = 1100 } = {}) {
     if (this.state !== "idle") return;
     this.state = "starting";
     try {
@@ -60,7 +61,7 @@ export class Recorder {
         if (!spokeAt) spokeAt = now;
       }
       const silentFor = now - lastLoud;
-      if ((spokeAt && now - spokeAt > 250 && silentFor > 1100) || now - t0 > maxMs) {
+      if ((spokeAt && now - spokeAt > 250 && silentFor > silenceMs) || now - t0 > maxMs) {
         onAutoStop?.();
         return;
       }
