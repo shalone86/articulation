@@ -53,7 +53,8 @@ cloudflared tunnel --url http://localhost:8000   # free HTTPS URL, no open ports
 
 - Speech-to-text: [faster-whisper](https://github.com/SYSTRAN/faster-whisper), CPU is fine. Set `WHISPER_MODEL` in `docker-compose.yml` (`base.en` is fast, `small.en` is the default and more accurate).
 - **Better word checking:** this backend also does *forced-choice scoring*. It asks Whisper how likely the audio is to be the target word versus each of its look-alikes, so results don't depend only on Whisper's open guess. See the workshop doc for the numbers.
-- Voice: a local [Piper](https://github.com/OHF-Voice/piper1-gpl) voice (`PIPER_VOICE`, downloaded on first use). Remove that line to use each device's built-in voice.
+- Voice: a local [Kokoro](https://github.com/thewh1teagle/kokoro-onnx) voice (`KOKORO_VOICE`, default `af_heart` in the Docker image; ~330 MB downloaded on first use), which sounds more natural than Piper. Set `KOKORO_VOICE=` (empty) to use Piper instead.
+- Alternative voice: a local [Piper](https://github.com/OHF-Voice/piper1-gpl) voice (`PIPER_VOICE`, downloaded on first use). Remove that line to use each device's built-in voice.
 - Recordings never leave your server.
 - **Browsers only allow the microphone on HTTPS (or localhost).** Put it behind a reverse proxy with TLS (Caddy, nginx + Let's Encrypt), or use a Cloudflare Tunnel.
 

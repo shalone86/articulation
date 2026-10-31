@@ -15,7 +15,7 @@ Goal: the app keeps working when the home internet (or the home server) is down,
 | Piece | Free? | What it does |
 |---|---|---|
 | **Cloudflare Workers** | Free plan; Workers AI has a free daily allowance that 1–2 learners won't come near | Serves the app worldwide over HTTPS, the server voice (cached), and a speech check that always answers |
-| **Hugging Face Space** (CPU basic: 2 vCPU, 16 GB RAM) | Free | Runs `server/` — faster-whisper `small.en` + Piper — for the better forced-choice scoring. It's also a full working copy of the app on its own URL. |
+| **Hugging Face Space** (CPU basic: 2 vCPU, 16 GB RAM) | Free | Runs `server/` — faster-whisper `small.en` + the Kokoro voice — for the better forced-choice scoring. It's also a full working copy of the app on its own URL. |
 
 Nothing runs at your house. If the Space is asleep or broken, checks quietly fall back to Workers AI (open transcription, ~90% vs ~95% on the benchmark in WORKSHOP.md); the next check after it wakes uses the Space again.
 

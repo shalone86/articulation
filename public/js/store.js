@@ -78,6 +78,27 @@ export function recordAttempt(cardId, word, success, result) {
   save();
 }
 
+/** Remember which card the learner was on in a deck, so the deck page can offer "Continue". */
+export function setResume(deckId, cardId) {
+  (mine().resume ??= {})[deckId] = cardId;
+  save();
+}
+export const resume = (deckId) => mine().resume?.[deckId];
+
+/** new | tried (never matched) | learning (some matches) | mastered (3 stars) */
+export function cardStatus(id) {
+  const c = cardProgress(id);
+  if (!c.tries) return "new";
+  if (stars(id) === 3) return "mastered";
+  return c.wins ? "learning" : "tried";
+}
+
+/** new | tried | won for one practice word on a card. */
+export function wordStatus(cardId, word) {
+  const w = cardProgress(cardId).words[word];
+  return !w ? "new" : w[1] > 0 ? "won" : "tried";
+}
+
 export function recordPair(success) {
   const p = mine().pairs;
   p.tries++;

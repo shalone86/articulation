@@ -130,12 +130,17 @@ function toast(msg) {
 }
 
 function celebrate(anchor) {
-  if (reducedMotion() || !anchor) return;
+  if (!anchor) return;
+  anchor.classList.remove("win");
+  void anchor.offsetWidth; // restart the glow animation
+  anchor.classList.add("win");
+  setTimeout(() => anchor.classList.remove("win"), 1200);
+  if (reducedMotion()) return;
   const r = anchor.getBoundingClientRect();
   const layer = document.createElement("div");
   layer.className = "confetti";
   layer.style.left = `${r.left + r.width / 2}px`;
-  layer.style.top = `${r.top + r.height / 2}px`;
+  layer.style.top = `${Math.max(r.top, 0) + Math.min(r.height, innerHeight) / 3}px`;
   for (let i = 0; i < 26; i++) {
     const s = document.createElement("i");
     const a = (Math.PI * 2 * i) / 26 + Math.random() * 0.4;
@@ -172,7 +177,7 @@ async function viewHome() {
   render(`
     <section class="hero">
       <div class="hero-text">
-        <h1>Hi, ${esc(store.currentLearner())}! <span class="wave" aria-hidden="true">👋</span></h1>
+        <h1>${store.currentLearner() === "Me" ? "Hi!" : `Hi, ${esc(store.currentLearner())}!`} <span class="wave" aria-hidden="true">👋</span></h1>
         <p>Pick a card. <b>🎤 Try it</b>, then <b>👂 listen</b> to how it should sound.</p>
       </div>
       <form class="search-box" id="home-search" role="search">
@@ -226,22 +231,36 @@ function viewDeck(id) {
   const deck = deckById[id];
   if (!deck) return (location.hash = "#/");
   const cards = deck.cards();
+  const resumeCard = cards.find((c) => c.id === store.resume(id) && c !== cards[0]);
+  const started = cards.filter((c) => store.cardStatus(c.id) !== "new").length;
+  const mastered = cards.filter((c) => store.cardStatus(c.id) === "mastered").length;
   render(`
     <nav class="crumbs"><a href="#/">Home</a> › ${esc(deck.name)}</nav>
     <div class="deck-head" data-cat="${deck.cat}">
       <h1><span aria-hidden="true">${deck.emoji}</span> ${esc(deck.name)}</h1>
       ${deck.describe ? `<p class="muted">${esc(deck.describe())}</p>` : ""}
-      ${cards.length ? `<a class="btn primary" href="#/card/${id}/${cards[0].id}">▶ Start practicing</a>` : ""}
+      ${cards.length ? `<div class="deck-progress" aria-hidden="true"><div style="width:${Math.round((mastered / cards.length) * 100)}%"></div></div>
+        <p class="muted small">${started} of ${cards.length} tried · ${mastered} mastered ★★★</p>
+        <div class="actions start">
+          ${resumeCard ? `<a class="btn primary" href="#/card/${id}/${resumeCard.id}">▶ Continue: ${esc(resumeCard.big)} (card ${cards.indexOf(resumeCard) + 1})</a>` : ""}
+          <a class="btn ${resumeCard ? "" : "primary"}" href="#/card/${id}/${cards[0].id}">${resumeCard ? "↺ From the start" : "▶ Start practicing"}</a>
+        </div>` : ""}
     </div>
     <div class="card-grid">
-      ${cards.map((c) => `
-        <a class="mini-card" data-cat="${c.cat}" href="#/card/${id}/${c.id}">
+      ${cards.map((c) => {
+        const st = store.cardStatus(c.id);
+        const p = store.cardProgress(c.id);
+        const badge = { new: "", tried: "○ tried", learning: `◐ ${p.wins}/${p.tries}`, mastered: "✓ mastered" }[st];
+        return `
+        <a class="mini-card ${st}" data-cat="${c.cat}" href="#/card/${id}/${c.id}" title="${st === "new" ? "Not tried yet" : `${p.wins} of ${p.tries} tries matched`}">
           ${c.emoji ? `<span class="emoji" aria-hidden="true">${c.emoji}</span>` : ""}
           <b>${esc(c.big)}</b>
           ${c.ipa ? ipa(c.ipa) : ""}
           <small>${esc(c.words[0])}</small>
           ${stars(store.stars(c.id))}
-        </a>`).join("") || `<p class="muted">Nothing here yet.</p>`}
+          <span class="badge">${badge || "&nbsp;"}</span>
+        </a>`;
+      }).join("") || `<p class="muted">Nothing here yet.</p>`}
     </div>`);
 }
 
@@ -254,7 +273,7 @@ function openCard(cardId) {
 
 // ───────────────────────── flip card ─────────────────────────
 let cs; // card view state
-let slide = ""; // "left" | "right": direction of the next card animation
+let slide = ""; // "left" | "right": direction of the next card animation (buttons and arrow keys)
 
 function viewCard(deckId, ref) {
   const deck = deckById[deckId];
@@ -266,6 +285,7 @@ function viewCard(deckId, ref) {
   if (!card) return (location.hash = `#/deck/${deckId}`);
   if (index < 0) index = 0; // e.g. a card that just left the "needs practice" deck
   store.setLastCard(deck.id, card.id);
+  store.setResume(deck.id, card.id);
   const n = cards.length;
   const prev = n > 1 ? cards[(index - 1 + n) % n] : null;
   const next = n > 1 ? cards[(cards[index] === card ? index + 1 : index) % n] : null;
@@ -309,18 +329,18 @@ function showCard(card, { crumbs, count = "", prev, next }) {
         <div class="face front" id="front"></div>
         <div class="face back" id="back" aria-hidden="true"></div>
       </div></div>
-      ${prev || next ? `<div class="pager">
-        <a class="btn" data-go="prev" href="${prev}" aria-label="Previous card">◀ <span>Prev</span></a>
-        <span class="muted small swipe-hint">swipe to change cards</span>
-        <a class="btn" data-go="next" href="${next}" aria-label="Next card"><span>Next</span> ▶</a>
-      </div>` : ""}
     </div>
     <p class="muted center keys small">Keys: <kbd>space</kbd> record · <kbd>F</kbd> flip · <kbd>←</kbd> <kbd>→</kbd> cards</p>
+    <div class="bottom-bar" data-cat="${card.cat}">
+      ${prev ? `<a class="btn bar-nav" data-go="prev" href="${prev}" aria-label="Previous card">◀</a>` : ""}
+      <button class="btn bar-nav bar-act" id="bar-act"></button>
+      <button class="btn flip-btn" id="flip-btn" data-flip></button>
+      ${next ? `<a class="btn bar-nav" data-go="next" href="${next}" aria-label="Next card">▶</a>` : ""}
+    </div>
   `);
   slide = "";
   renderFront();
   renderBack();
-  bindSwipe(document.getElementById("scene"));
   // Warm the voice for this card once the learner stops on it (not while paging quickly).
   const mine = cs;
   setTimeout(() => cs === mine && prefetch([mine.target, card.sentence].filter(Boolean)), 600);
@@ -333,28 +353,29 @@ function go(dir) {
   location.hash = href;
 }
 
-function bindSwipe(el) {
-  let x0, y0, t0, ignore;
-  el.addEventListener("touchstart", (e) => {
-    const t = e.touches[0];
-    x0 = t.clientX; y0 = t.clientY; t0 = Date.now();
-    // Let rows that scroll sideways (word chips, tabs) keep their own swipe.
-    ignore = !!e.target.closest(".targets, .tabs, input, select");
-  }, { passive: true });
-  el.addEventListener("touchend", (e) => {
-    if (ignore || x0 == null) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - x0, dy = t.clientY - y0;
-    x0 = null;
-    if (Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy) && Date.now() - t0 < 800) go(dx < 0 ? "next" : "prev");
-  }, { passive: true });
+/** The flip button lives in a bar pinned to the bottom of the screen, so it never scrolls away. */
+function updateFlipBtn() {
+  const b = document.getElementById("flip-btn");
+  if (!b) return;
+  b.textContent = "↻ Flip";
+  b.setAttribute("aria-label", cs.flipped ? "Flip back to try it" : "Flip to listen");
+  b.classList.toggle("nudge", !cs.flipped && !!cs.take);
+  // Same job as the big button on the visible side: record on the front, listen on the back.
+  const a = document.getElementById("bar-act");
+  const rec = recorder.state === "recording";
+  a.textContent = cs.flipped ? "👂" : rec ? "⏹" : cs.busy ? "⏳" : "🔴";
+  a.setAttribute("aria-label", cs.flipped ? "Listen" : rec ? "Stop recording" : "Record");
+  a.classList.toggle("recording", !cs.flipped && rec);
 }
 
 function targetPicker() {
   const c = cs.card;
   if (c.words.length < 2 && !c.sentence) return "";
   return `<div class="targets" role="group" aria-label="Choose what to practice">
-    ${c.words.map((w) => `<button class="chip ${!cs.isSentence && w === cs.target ? "on" : ""}" data-target="${esc(w)}">${esc(w)}</button>`).join("")}
+    ${c.words.map((w) => {
+      const st = store.wordStatus(c.id, w);
+      return `<button class="chip ${st} ${!cs.isSentence && w === cs.target ? "on" : ""}" data-target="${esc(w)}" title="${st === "won" ? "You’ve said this one right" : st === "tried" ? "Tried, not matched yet" : "Not tried yet"}">${esc(w)}${st === "won" ? ` <span class="mk">✓</span>` : st === "tried" ? ` <span class="mk">○</span>` : ""}</button>`;
+    }).join("")}
     ${c.sentence ? `<button class="chip sentence ${cs.isSentence ? "on" : ""}" data-target="__sentence">💬 sentence</button>` : ""}
   </div>`;
 }
@@ -373,13 +394,33 @@ function renderFront() {
     <header class="face-head"><span class="cat-pill">${esc(catLabel(c))}</span>${c.kind === "word" ? "" : stars(store.stars(c.id))}</header>
     <div class="glyph">${c.emoji ? `<span class="emoji" aria-hidden="true">${c.emoji}</span>` : ""}<b>${esc(c.big)}</b>${ipa(c.ipa)}</div>
     <p class="say-this"><span>Say</span> <strong class="${cs.isSentence ? "sentence-text" : "word-text"}">${esc(target)}</strong></p>
-    ${targetPicker()}
     <div class="rec-row">
       <button class="rec" id="rec" aria-label="Record">${recorder.state === "recording" ? "⏹" : "🎤"}</button>
     </div>
     <div class="status" id="status">${micSupported() ? "Tap the microphone and say it." : "This browser can’t record audio. You can still listen on the other side."}</div>
     <div id="result" aria-live="polite">${resultHtml()}</div>
+    ${targetPicker()}
+    ${c.kind === "word" ? "" : historyHtml()}
   `;
+  updateFlipBtn();
+}
+
+function ago(t) {
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`;
+  const d = Math.round(h / 24);
+  return `${d} day${d === 1 ? "" : "s"} ago`;
+}
+
+/** What this learner has already done on this card, from saved progress. */
+function historyHtml() {
+  const p = store.cardProgress(cs.card.id);
+  if (!p.tries) return `<p class="history">🆕 New card: you haven’t tried it yet.</p>`;
+  const good = p.last === "correct" || p.last === "homophone";
+  return `<p class="history">${good ? "✅" : "🔁"} Last try ${ago(p.at)} · ${p.wins} of ${p.tries} matched</p>`;
 }
 
 function resultHtml() {
@@ -496,6 +537,9 @@ function flip(to = !cs.flipped) {
   document.getElementById("back").setAttribute("aria-hidden", String(!to));
   document.querySelectorAll("[data-side]").forEach((b) =>
     b.setAttribute("aria-selected", String((b.dataset.side === "back") === to)));
+  updateFlipBtn();
+  const scene = document.getElementById("scene");
+  if (scene.getBoundingClientRect().top < 0) scene.scrollIntoView({ behavior: "smooth" });
 }
 
 async function toggleRecord() {
@@ -515,6 +559,7 @@ async function toggleRecord() {
     });
     btn.classList.add("recording");
     btn.textContent = "⏹";
+    updateFlipBtn();
     status.textContent = "Listening… (it stops by itself when you finish)";
   } catch (e) {
     status.textContent = e.message;
@@ -531,6 +576,7 @@ async function finishRecording() {
   const btn = document.getElementById("rec");
   btn.classList.remove("recording");
   btn.textContent = "⏳";
+  updateFlipBtn();
   try {
     const take = await recorder.stop();
     if (cs !== mine) return;
@@ -562,7 +608,7 @@ async function finishRecording() {
   renderFront();
   document.getElementById("status").textContent = "Tap the microphone to try again.";
   const won = (cs.result?.score && isSuccess(cs.result.score)) || cs.result?.sentence?.score >= 0.9;
-  if (won) celebrate(document.getElementById("rec"));
+  if (won) celebrate(document.getElementById("front"));
 }
 
 $app.addEventListener("click", async (e) => {
@@ -571,6 +617,8 @@ $app.addEventListener("click", async (e) => {
   if (!t) return;
   if (t.dataset.go) { e.preventDefault(); return go(t.dataset.go); }
   if (t.id === "rec") return toggleRecord();
+  if (t.id === "bar-act") return cs.flipped ? speak(cs.isSentence ? cs.card.sentence : cs.target).catch((err) => toast(`🔇 ${err.message}`)) : toggleRecord();
+  if (t.hasAttribute("data-flip")) return flip();
   if (t.dataset.side) return flip(t.dataset.side === "back");
   if (t.dataset.tab) {
     cs.tab = t.dataset.tab;
@@ -723,7 +771,6 @@ function viewPairs() {
   render(`
     <nav class="crumbs"><a href="#/">Home</a> › Minimal pairs</nav>
     <h1>⇄ Minimal pairs</h1>
-    <p class="muted">Two words, one sound different. <b>Listen</b> trains your ear; <b>Say</b> checks whether the speech checker hears the word you meant.</p>
     <div class="controls">
       <div class="seg" role="group">
         <button class="${ps.mode === "listen" ? "on" : ""}" data-mode="listen">👂 Listen</button>
@@ -732,7 +779,9 @@ function viewPairs() {
       <select id="pair-filter" aria-label="Sound">${opts.map(([v, n]) => `<option value="${v}" ${v === ps.filter ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>
       <span class="muted small" id="pair-score">Score: ${st.wins} / ${st.tries}</span>
     </div>
-    <div class="game" id="game"></div>`);
+    <div class="game" id="game"></div>
+    <div class="bottom-bar"><button class="btn flip-btn" id="next-pair">Skip →</button></div>`);
+  document.getElementById("next-pair").onclick = nextPair;
   document.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = () => { ps.mode = b.dataset.mode; viewPairs(); }));
   document.getElementById("pair-filter").onchange = (e) => { ps.filter = e.target.value; nextPair(); };
   nextPair();
@@ -745,13 +794,20 @@ function pairPool() {
   return ALL_PAIRS.filter((p) => p.sound === ps.filter);
 }
 
-function updatePairScore() {
+/** After an answer: refresh the score and turn Skip into Next (it sits in the bottom bar, always reachable). */
+function pairAnswered() {
   const st = store.pairStats();
   const el = document.getElementById("pair-score");
   if (el) el.textContent = `Score: ${st.wins} / ${st.tries}`;
+  const b = document.getElementById("next-pair");
+  if (!b) return;
+  b.textContent = "Next →";
+  b.classList.add("nudge");
 }
 
 function nextPair() {
+  const nb = document.getElementById("next-pair");
+  if (nb) { nb.textContent = "Skip →"; nb.classList.remove("nudge"); }
   const pool = pairPool();
   const game = document.getElementById("game");
   if (!pool.length) return (game.innerHTML = `<p class="muted">No pairs for this choice.</p>`);
@@ -773,7 +829,6 @@ function nextPair() {
       ps.round.answered = true;
       const ok = b.dataset.choice === target;
       store.recordPair(ok);
-      updatePairScore();
       b.classList.add(ok ? "right" : "wrong");
       if (ok) celebrate(b);
       if (!ok) game.querySelector(`[data-choice="${CSS.escape(target)}"]`)?.classList.add("right");
@@ -781,9 +836,8 @@ function nextPair() {
         <div class="feedback ${ok ? "good" : "warn"}">
           <p><b>${ok ? "✅ Right!" : `❌ It was “${esc(target)}”.`}</b> Listen to both: ${pairBtns([pair.a, pair.b])}</p>
           <p class="muted small">Sound: <a href="#/c/s-${p.id}">${esc(p.label)} ${ipa(p.ipa)}</a></p>
-        </div>
-        <button class="btn primary" id="next-pair">Next →</button>`;
-      document.getElementById("next-pair").onclick = nextPair;
+        </div>`;
+      pairAnswered();
     }));
   } else {
     game.innerHTML = `
@@ -809,21 +863,21 @@ function nextPair() {
           const { text, scores } = await transcribe(take.wav, candidatesFor(target, pairs));
           const s = refineWithScores(scoreWord(target, text, { pairs }), target, scores, pairs);
           ok = isSuccess(s);
-          if (s.result !== "nothing") { store.recordPair(ok); updatePairScore(); }
+          if (s.result !== "nothing") store.recordPair(ok);
           html = `<div class="feedback ${ok ? "good" : "warn"}"><p><b>${
             ok ? `✅ That sounded like “${esc(target)}”.` : s.result === "swap" ? `🤔 That sounded like “${esc(other)}”.` : s.result === "nothing" ? "🙉 I didn’t catch that." : `🤔 I heard “${esc(s.word ?? s.heard)}”.`
           }</b></p>${!ok ? `<p class="tip">💡 ${esc(p.how)}</p>` : ""}</div>
           <button class="btn" id="mine">▶ My try</button>`;
         }
         if (!fb.isConnected) return;
-        fb.innerHTML = html + `<button class="btn primary" id="next-pair">Next →</button>`;
+        fb.innerHTML = html;
+        pairAnswered();
         document.getElementById("mine")?.addEventListener("click", () => playUrl(take.url).catch((e) => toast(`🔇 ${e.message}`)));
-        document.getElementById("next-pair").onclick = nextPair;
-        if (ok) celebrate(btn);
+        if (ok) celebrate(document.getElementById("game"));
       } catch (e) {
         if (!fb.isConnected) return;
-        fb.innerHTML = `<div class="feedback warn"><p>${esc(e.message)}</p></div><button class="btn primary" id="next-pair">Next →</button>`;
-        document.getElementById("next-pair").onclick = nextPair;
+        fb.innerHTML = `<div class="feedback warn"><p>${esc(e.message)}</p></div>`;
+        pairAnswered();
       }
       btn.textContent = "🎤";
     };
@@ -874,8 +928,11 @@ function homophoneQuiz() {
     const ok = b.dataset.h === word;
     b.classList.add(ok ? "right" : "wrong");
     if (ok) celebrate(b);
+    else el.querySelector(`[data-h="${CSS.escape(word)}"]`)?.classList.add("right");
     document.getElementById("h-fb").innerHTML = `<p>${ok ? "✅ Yes!" : `❌ It’s “${esc(word)}”.`}</p><button class="btn primary" id="h-next">Next →</button>`;
-    document.getElementById("h-next").onclick = homophoneQuiz;
+    const next = document.getElementById("h-next");
+    next.onclick = homophoneQuiz;
+    next.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }));
 }
 
@@ -914,7 +971,7 @@ function viewProgress() {
     }).join("");
   render(`
     <nav class="crumbs"><a href="#/">Home</a> › Progress</nav>
-    <h1>⭐ ${esc(store.currentLearner())}’s progress</h1>
+    <h1>⭐ ${store.currentLearner() === "Me" ? "Your progress" : `${esc(store.currentLearner())}’s progress`}</h1>
     <div class="stats">
       <div data-cat="plosive"><b>${tried.length}</b><small>cards practiced</small></div>
       <div data-cat="vowel"><b>${total ? Math.round((wins / total) * 100) : 0}%</b><small>tries matched</small></div>
@@ -930,6 +987,9 @@ function viewProgress() {
 async function viewSettings() {
   const s = store.settings();
   const voices = browserVoices();
+  const h = await health();
+  const serverVoices = h.voices?.length ? h.voices
+    : ["asteria", "luna", "stella", "athena", "hera", "orion", "arcas", "perseus", "angus", "orpheus", "helios", "zeus"];
   render(`
     <nav class="crumbs"><a href="#/">Home</a> › Settings</nav>
     <h1>⚙️ Settings</h1>
@@ -964,7 +1024,7 @@ async function viewSettings() {
             <option value="browser" ${s.ttsSource === "browser" ? "selected" : ""}>This device’s built-in voice (works offline)</option>
           </select></label>
         <label>Server voice
-          <select id="serverVoice">${["asteria", "luna", "stella", "athena", "hera", "orion", "arcas", "perseus", "angus", "orpheus", "helios", "zeus"]
+          <select id="serverVoice">${serverVoices
             .map((v) => `<option ${v === s.serverVoice ? "selected" : ""}>${v}</option>`).join("")}</select></label>
         <label>Device voice
           <select id="voice"><option value="">Automatic</option>${voices.map((v) => `<option ${v.name === s.voice ? "selected" : ""} value="${esc(v.name)}">${esc(v.name)} (${esc(v.lang)})</option>`).join("")}</select></label>

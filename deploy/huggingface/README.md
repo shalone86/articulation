@@ -13,4 +13,4 @@ short_description: Pronunciation flip cards with a Whisper speech checker
 
 Pronunciation practice for English learners and kids. Source and docs:
 see the main repository. This Space runs the self-hosted backend
-(faster-whisper `small.en` with forced-choice scoring, Piper voice) and serves the app.
+(faster-whisper `small.en` with forced-choice scoring, Kokoro voice) and serves the app.
