@@ -43,7 +43,7 @@ npx wrangler secret put APP_PASSCODE
 If you set a passcode, enter it once under **Settings → Speech checker** on each device.
 
 - Speech-to-text: `@cf/openai/whisper-large-v3-turbo`
-- Voice: `@cf/deepgram/aura-1` (consistent and natural, cached at the edge). Each device can switch to its built-in voice in Settings.
+- Voice: `@cf/deepgram/aura-2-en` (40 natural voices, default Thalia; cached at the edge). Each device can switch to its built-in voice in Settings.
 - Local dev: `npx wrangler dev` (the AI binding calls your Cloudflare account).
 
 ### Option B: Your own server (Docker) — my pick

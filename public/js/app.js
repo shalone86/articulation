@@ -360,9 +360,11 @@ function showCard(card, { crumbs, count = "", prev, next }) {
       ${next ? `<a class="btn bar-nav" data-go="next" href="${next}" aria-label="Next card">▶</a>` : ""}
     </div>
   `);
+  const arrived = !!slide; // came here with next/prev, so the learner wants to hear the new word
   slide = "";
   renderFront();
   renderBack();
+  if (arrived && store.settings().autoSay) speak(start).catch(() => { /* autoplay blocked: the 🔊 button still works */ });
   // Warm the voice for this card once the learner stops on it (not while paging quickly).
   const mine = cs;
   setTimeout(() => cs === mine && prefetch([mine.target, card.sentence].filter(Boolean)), 600);
@@ -1011,7 +1013,7 @@ async function viewSettings() {
   const voices = browserVoices();
   const h = await health();
   const serverVoices = h.voices?.length ? h.voices
-    : ["asteria", "luna", "stella", "athena", "hera", "orion", "arcas", "perseus", "angus", "orpheus", "helios", "zeus"];
+    : ["thalia", "asteria", "luna", "athena", "helena", "aurora", "iris", "cora", "apollo", "arcas", "orion", "zeus"];
   render(`
     <nav class="crumbs"><a href="#/">Home</a> › Settings</nav>
     <h1>⚙️ Settings</h1>
@@ -1038,6 +1040,7 @@ async function viewSettings() {
         <div id="l1-preview">${s.language ? l1Html(s.language, store.checkup()) : ""}</div>
         <label class="check"><input type="checkbox" id="showIpa" ${s.showIpa ? "checked" : ""}> Show IPA symbols (like /θ/)</label>
         <label class="check"><input type="checkbox" id="kidMode" ${s.kidMode ? "checked" : ""}> Kid mode (bigger buttons)</label>
+        <label class="check"><input type="checkbox" id="autoSay" ${s.autoSay ? "checked" : ""}> Say each word when I go to the next card</label>
       </fieldset>
       <fieldset><legend>Voice</legend>
         <label>Voice source
@@ -1075,7 +1078,7 @@ async function viewSettings() {
   on("language", "change", (e) => {
     document.getElementById("l1-preview").innerHTML = e.target.value ? l1Html(e.target.value, store.checkup()) : "";
   });
-  for (const id of ["showIpa", "kidMode"]) on(id, "change", (e) => { store.setSetting(id, e.target.checked); applyLook(); });
+  for (const id of ["showIpa", "kidMode", "autoSay"]) on(id, "change", (e) => { store.setSetting(id, e.target.checked); applyLook(); });
   on("rate", "input", (e) => { store.setSetting("rate", +e.target.value); document.getElementById("rate-out").textContent = e.target.value; });
   on("passcode", "change", async (e) => { store.setSetting("passcode", e.target.value.trim()); await showHealth(true); });
   on("export", "click", () => {

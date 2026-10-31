@@ -13,6 +13,7 @@ export const HOMOPHONES = [
   [["right", "correct / not left"], ["write", "to put words on paper"]],
   [["hear", "to listen"], ["here", "in this place"]],
   [["eight", "the number 8"], ["ate", "past of eat"]],
+  [["wood", "what trees are made of"], ["would", "as in “I would like…”"]],
   [["one", "the number 1"], ["won", "past of win"]],
   [["blue", "a color"], ["blew", "past of blow"]],
   [["sun", "the star in the sky"], ["son", "a boy child"]],

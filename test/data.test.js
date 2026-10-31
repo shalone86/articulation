@@ -17,7 +17,11 @@ test("all sounds have unique ids and complete fields", () => {
     assert.ok(p.words || p.positions, `${p.id} words`);
     if (p.partner) assert.equal(phonemeById[p.partner]?.partner, p.id, `${p.id} partner is mutual`);
     for (const l of Object.keys(p.esl ?? {})) assert.ok(langIds.has(l), `${p.id}: unknown language ${l}`);
-    for (const pair of p.pairs ?? []) assert.equal(pair.length, 2, `${p.id} pair ${pair}`);
+    for (const pair of p.pairs ?? []) {
+      assert.equal(pair.length, 2, `${p.id} pair ${pair}`);
+      // A minimal pair has to sound different, or the listening game can't be won.
+      assert.ok(!homophonesOf(pair[0]).includes(pair[1].toLowerCase()), `${p.id} pair ${pair} are homophones`);
+    }
   }
   assert.equal(PHONEMES.filter((p) => p.group === "consonant").length, 24);
 });

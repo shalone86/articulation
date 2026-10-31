@@ -584,7 +584,7 @@ export const PHONEMES = [
     spellings: [["w", "web"], ["wh", "whale"], ["u (after q)", "queen"], ["o", "one"], ["u (after g, s)", "language"]],
     positions: { initial: ["web", "wet", "window", "one"], medial: ["sandwich", "away", "flower", "quiet"], final: [] },
     sentence: "We went walking in the wet woods on Wednesday.",
-    pairs: [["west", "vest"], ["wine", "vine"], ["wet", "vet"], ["worse", "verse"], ["wood", "would"], ["wail", "veil"], ["wear", "hair"]],
+    pairs: [["west", "vest"], ["wine", "vine"], ["wet", "vet"], ["worse", "verse"], ["wiper", "viper"], ["wail", "veil"], ["wear", "hair"]],
     esl: {
       german: "German “w” = /v/, so “west” comes out as “vest”. Round your lips into “oo” — no teeth.",
       russian: "Russian has no /w/; it often becomes /v/ (“vest” for west). Round your lips — no teeth.",
@@ -1034,7 +1034,8 @@ export const PHONEMES = [
     spellings: [["ure", "pure"], ["our", "tour"], ["oor", "poor"], ["ur", "jury"]],
     words: ["tour", "pure", "cure", "sure", "jury", "poor", "tourist", "mature"],
     sentence: "I am sure the tourist will tour the pure lake.",
-    pairs: [["poor", "pour"], ["tour", "tore"], ["sure", "shore"], ["pure", "purr"]],
+    // Not poor/pour, tour/tore, sure/shore or moor/more: most Americans (and the voice) say those the same.
+    pairs: [["pure", "purr"], ["cure", "car"], ["tour", "tar"]],
     esl: {
       german: "Pronounce the r.",
     },

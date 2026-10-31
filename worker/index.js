@@ -2,7 +2,7 @@
 //
 //   GET  /api/health      → { stt, tts, backend, model }
 //   POST /api/transcribe  → body: audio/wav (16 kHz mono) → { text, words }
-//   GET  /api/tts?text=…&voice=asteria → audio/mpeg
+//   GET  /api/tts?text=…&voice=thalia → audio/mpeg
 //
 //   GET  /.well-known/assetlinks.json → proves the Android app owns this site (see docs/ANDROID.md)
 //
@@ -15,8 +15,13 @@
 // Optional vars ANDROID_PACKAGE and ANDROID_SHA256 (comma-separated fingerprints) for assetlinks.
 
 const STT_MODEL = "@cf/openai/whisper-large-v3-turbo";
-const TTS_MODEL = "@cf/deepgram/aura-1";
-const TTS_VOICES = new Set(["angus", "asteria", "arcas", "orion", "orpheus", "athena", "luna", "zeus", "perseus", "helios", "hera", "stella"]);
+const TTS_MODEL = "@cf/deepgram/aura-2-en";
+// Aura-2 English voices, the clearest first (the Settings list shows them in this order).
+const TTS_VOICE_LIST = ["thalia", "asteria", "luna", "athena", "helena", "aurora", "iris", "cora", "delia", "harmonia",
+  "andromeda", "amalthea", "callista", "cordelia", "electra", "hera", "juno", "minerva", "ophelia", "pandora", "phoebe",
+  "theia", "vesta", "apollo", "arcas", "aries", "atlas", "draco", "hermes", "hyperion", "janus", "jupiter", "mars",
+  "neptune", "odysseus", "orion", "orpheus", "pluto", "saturn", "zeus"];
+const TTS_VOICES = new Set(TTS_VOICE_LIST);
 const MAX_AUDIO_BYTES = 2 * 1024 * 1024; // ~60 s of 16 kHz mono WAV
 const ORIGIN_TIMEOUT_MS = 12000; // a sleeping Hugging Face Space takes longer than this to wake
 
@@ -33,7 +38,7 @@ export default {
       switch (`${request.method} ${url.pathname}`) {
         case "GET /api/health":
           if (env.STT_ORIGIN) return await proxyHealth(env);
-          return json({ stt: !!env.AI, tts: !!env.AI, backend: "Cloudflare Workers AI", model: STT_MODEL.split("/").pop() });
+          return json({ stt: !!env.AI, tts: !!env.AI, backend: "Cloudflare Workers AI", model: STT_MODEL.split("/").pop(), voices: TTS_VOICE_LIST });
         case "POST /api/transcribe": {
           const audio = await request.arrayBuffer();
           if (!audio.byteLength) return json({ error: "empty audio" }, 400);
@@ -95,10 +100,10 @@ async function proxyHealth(env) {
       headers: originHeaders(env), signal: AbortSignal.timeout(5000),
     });
     const h = await r.json();
-    return json({ ...h, tts: !!env.AI, backend: `${h.backend} via Cloudflare` });
+    return json({ ...h, tts: !!env.AI, voices: TTS_VOICE_LIST, backend: `${h.backend} via Cloudflare` });
   } catch (e) {
     // Speech server asleep or down: checks still work through Workers AI.
-    return json({ stt: !!env.AI, tts: !!env.AI, backend: "Cloudflare Workers AI (fallback)", model: STT_MODEL.split("/").pop() });
+    return json({ stt: !!env.AI, tts: !!env.AI, backend: "Cloudflare Workers AI (fallback)", model: STT_MODEL.split("/").pop(), voices: TTS_VOICE_LIST });
   }
 }
 
@@ -117,10 +122,10 @@ function assetLinks(env) {
 async function tts(request, url, env, ctx) {
   const text = (url.searchParams.get("text") ?? "").trim().slice(0, 300);
   if (!text) return json({ error: "missing text" }, 400);
-  const voice = TTS_VOICES.has(url.searchParams.get("voice")) ? url.searchParams.get("voice") : "asteria";
+  const voice = TTS_VOICES.has(url.searchParams.get("voice")) ? url.searchParams.get("voice") : "thalia";
 
   // Same text + voice → same audio, so cache it at the edge.
-  const cacheKey = new Request(`https://tts.cache/${voice}/${encodeURIComponent(text)}`);
+  const cacheKey = new Request(`https://tts.cache/aura-2/${voice}/${encodeURIComponent(text)}`);
   const cache = caches.default;
   const hit = await cache.match(cacheKey);
   if (hit) return hit;

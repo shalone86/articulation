@@ -10,7 +10,8 @@ const DEFAULTS = {
     showIpa: true,
     ttsSource: "auto", // auto | server | browser
     voice: "", // browser voice name
-    serverVoice: "asteria",
+    serverVoice: "thalia",
+    autoSay: true, // say the word when moving to the next card
     rate: 0.9,
     passcode: "",
     kidMode: false,
