@@ -4,7 +4,7 @@ Goal: the app keeps working when the home internet (or the home server) is down,
 
 ## Live setup (October 2026)
 
-**Cloudflare Worker only:** https://articulation.shalonely.com (also https://articulation.ariyandhamma.workers.dev) — the site, the server voice (Workers AI Aura) and the speech check (Workers AI Whisper). No `STT_ORIGIN` is set.
+**Cloudflare Worker only:** https://articulate.shalonely.com (also https://articulation.ariyandhamma.workers.dev) — the site, the server voice (Workers AI Aura) and the speech check (Workers AI Whisper). No `STT_ORIGIN` is set.
 
 The Hugging Face Space below is **no longer free**: since 2026, Hugging Face requires a PRO subscription (~$9/month) to host Docker or Gradio Spaces on the free CPU (`deploy.sh` stops with HTTP 402). Only static Spaces stay free, and those can't run `server/`. If you subscribe later, follow step 1 below and add `STT_ORIGIN` to `wrangler.jsonc` — the Worker then uses the Space and falls back to Workers AI by itself.
 
@@ -60,7 +60,7 @@ npx wrangler secret put STT_TOKEN         # only if the Space is private
 npx wrangler secret put APP_PASSCODE      # optional: keep strangers off your quota
 ```
 
-Custom domain: set in `wrangler.jsonc` (`"routes": [{ "pattern": "articulation.shalonely.com", "custom_domain": true }]`), so `npx wrangler deploy` creates the DNS record and certificate. (The dashboard's Workers → articulation → Settings → Domains & Routes does the same by hand.) (Your existing serve.shalonely.com can keep pointing at the home server.)
+Custom domain: set in `wrangler.jsonc` (`"routes": [{ "pattern": "articulate.shalonely.com", "custom_domain": true }]`), so `npx wrangler deploy` creates the DNS record and certificate. (The dashboard's Workers → articulation → Settings → Domains & Routes does the same by hand.) (Your existing serve.shalonely.com can keep pointing at the home server.)
 
 ### Updating
 
