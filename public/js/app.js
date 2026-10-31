@@ -76,6 +76,7 @@ const routes = [
   [/^chart$/, viewChart],
   [/^progress$/, viewProgress],
   [/^settings$/, viewSettings],
+  [/^install$/, viewInstall],
 ];
 
 let query = new URLSearchParams();
@@ -1074,10 +1075,70 @@ async function showHealth(force) {
     : `⚠️ Not connected. ${esc(h.error ?? "")}`;
 }
 
+// ───────────────────────── install (download) the app ─────────────────────────
+// Chrome, Edge and Samsung Internet offer a one-tap install through beforeinstallprompt;
+// iPhone/iPad and Firefox need the browser menu, so the install page explains how.
+let installPrompt = null;
+const isInstalled = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+function updateInstallLink() {
+  document.querySelectorAll(".install-link").forEach((a) => (a.hidden = isInstalled()));
+}
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault(); // show our own button instead of the browser's mini-bar
+  installPrompt = e;
+  updateInstallLink();
+  if (location.hash.startsWith("#/install")) viewInstall();
+});
+window.addEventListener("appinstalled", () => {
+  installPrompt = null;
+  toast("✅ Installed! Open Articulation from your home screen.");
+  updateInstallLink();
+  if (location.hash.startsWith("#/install")) viewInstall();
+});
+
+function viewInstall() {
+  const steps = isInstalled() ? `<p class="callout">✅ You’re using the installed app.</p>`
+    : installPrompt ? `<button class="btn primary big-btn" id="install-now">⬇ Download app</button>
+        <p class="muted small">Free and under 1 MB. It adds Articulation to your home screen and works offline.</p>`
+    : isIos() ? `<div class="install-steps"><h2>On iPhone or iPad (Safari)</h2><ol>
+        <li>Tap the <b>Share</b> button <span aria-hidden="true">(□↑)</span> at the bottom of Safari.</li>
+        <li>Scroll down and tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+        <li>Open <b>Articulation</b> from your home screen.</li></ol>
+        <p class="muted small">In Chrome on iPhone, use the Share button in the address bar, then Add to Home Screen.</p></div>`
+    : `<div class="install-steps"><h2>On Android (Chrome)</h2><ol>
+        <li>Tap the <b>⋮</b> menu at the top right.</li>
+        <li>Tap <b>Install app</b> (or <b>Add to Home screen</b>).</li></ol></div>
+       <div class="install-steps"><h2>On a computer (Chrome or Edge)</h2><ol>
+        <li>Click the install icon <span aria-hidden="true">(⊕ or 🖥↓)</span> at the right end of the address bar,</li>
+        <li>or open the browser menu and choose <b>Install Articulation</b>.</li></ol>
+        <p class="muted small">Firefox and Safari on a Mac can’t install web apps yet — use Chrome or Edge, or just bookmark this page.</p></div>`;
+  render(`
+    <nav class="crumbs"><a href="#/">Home</a> › Download app</nav>
+    <div class="install">
+      <div class="install-hero"><img src="icons/icon-192.png" alt=""><div><h1>Get the app</h1>
+        <p class="muted">Practice from your home screen — full screen, quick to open, and the cards, lessons and games work without internet.</p></div></div>
+      ${steps}
+      <p class="muted small">The speech checker still needs a connection. Your progress stays on this device.</p>
+    </div>`);
+  document.getElementById("install-now")?.addEventListener("click", async () => {
+    const p = installPrompt;
+    if (!p) return;
+    installPrompt = null;
+    p.prompt();
+    const { outcome } = await p.userChoice;
+    if (outcome !== "accepted") { installPrompt = null; toast("No problem — you can install it any time from this page."); }
+    viewInstall();
+  });
+}
+
 // ?look=studio in the page URL tries a look without changing the saved setting (handy for previews).
 const urlLook = new URLSearchParams(location.search).get("look");
 if (urlLook && LOOKS[urlLook]) lookOverride = urlLook;
 applyLook();
+updateInstallLink();
 window.addEventListener("hashchange", route);
 route();
 health(); // warm up: the first tap on 🔊 shouldn't wait for this

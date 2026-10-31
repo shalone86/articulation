@@ -60,6 +60,8 @@ mark { background: color-mix(in srgb, var(--accent) 25%, transparent); color: in
 .nav a { text-decoration: none; color: var(--muted); padding: 6px 12px; border-radius: var(--radius-sm); font-weight: 600; }
 .nav a:hover, .nav a.active { background: var(--accent-soft); color: var(--accent-strong, var(--accent)); }
 .mobile-only { display: none; }
+.nav a.install-link { color: var(--accent-strong, var(--accent)); border: var(--border-w) solid color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius: 999px; }
+.nav a.install-link[hidden] { display: none; }
 .tabbar { display: none; }
 @media (max-width: 720px) {
   :root { --tabbar-h: calc(62px + env(safe-area-inset-bottom)); }
@@ -67,6 +69,7 @@ mark { background: color-mix(in srgb, var(--accent) 25%, transparent); color: in
   .nav { margin-left: auto; }
   .nav a:not(.icon-link) { display: none; }
   .mobile-only { display: inline-block; }
+  .nav a.install-link { font-size: 0.85rem; padding: 4px 10px; white-space: nowrap; }
   .tabbar {
     display: grid; grid-template-columns: repeat(5, 1fr);
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: var(--tabbar-h);
@@ -397,6 +400,16 @@ body:has(.bottom-bar) .foot { padding-bottom: 18px; }
   position: fixed; left: 50%; bottom: calc(var(--tabbar-h) + 20px); transform: translateX(-50%); background: var(--text); color: var(--bg);
   padding: 10px 16px; border-radius: var(--radius-sm); z-index: 50; max-width: calc(100% - 32px); animation: pop-in 0.2s;
 }
+
+/* ── install page ── */
+.install { max-width: 560px; margin: 0 auto; display: grid; gap: 14px; }
+.install-hero { display: flex; gap: 16px; align-items: flex-start; }
+.install-hero img { width: 84px; height: 84px; border-radius: 22px; box-shadow: var(--card-shadow); flex: none; }
+.install-hero h1 { margin: 0; }
+.install .big-btn { justify-self: start; }
+.install ol { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
+.install-steps { background: var(--surface); border: var(--border-w) solid var(--border); border-radius: var(--radius); padding: 14px 18px; box-shadow: var(--card-shadow); }
+.install-steps h2 { margin: 0 0 8px; font-size: 1.1rem; }
 
 /* ── kid mode ── */
 body.kid { font-size: 20px; }
