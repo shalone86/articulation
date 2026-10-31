@@ -49,6 +49,8 @@ const UNCLEAR_PROBABILITY = 0.35; // a word the recognizer wrote, but wasn't sur
 /**
  * @param {{index: number, text: string, words?: {word: string, probability?: number}[]}[]} takes
  *   one transcript per recorded sentence (index into CHECKUP_SENTENCES)
+ * @param {{prefer?: string[]}} [options] prefer: sounds common for the learner's first
+ *   language; they win ties (never outrank stronger evidence)
  * @returns {{
  *   sounds: {id, score, probes, examples: {word, heard, status}[]}[],   // worst first
  *   patterns: {kind, name, lesson, example, count, examples: string[]}[],
@@ -57,7 +59,7 @@ const UNCLEAR_PROBABILITY = 0.35; // a word the recognizer wrote, but wasn't sur
  *   perSentence: {index, words: {word, status, heard?}[]}[],
  * }}
  */
-export function analyzeCheckup(takes) {
+export function analyzeCheckup(takes, { prefer = [] } = {}) {
   const sounds = new Map();
   const patterns = new Map();
   const perSentence = [];
@@ -112,9 +114,10 @@ export function analyzeCheckup(takes) {
   // Rank by miss rate, smoothed so one stray word doesn't outrank a sound that missed
   // three times out of four (score / (probes + 1)), then by how many misses.
   const rate = (x) => x.score / (x.probes + 1);
+  const pref = (x) => (prefer.includes(x.id) ? prefer.indexOf(x.id) : prefer.length);
   const ranked = [...sounds.values()]
     .filter((s) => s.score > 0)
-    .sort((a, b) => rate(b) - rate(a) || b.score - a.score);
+    .sort((a, b) => rate(b) - rate(a) || b.score - a.score || pref(a) - pref(b));
   return {
     sounds: ranked,
     patterns: [...patterns.values()].sort((a, b) => b.count - a.count),

@@ -419,6 +419,9 @@ body:has(.bottom-bar) .foot { padding-bottom: 18px; }
 .plan-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .plan-cards { display: flex; flex-wrap: wrap; gap: 6px; }
 .plan-cards .chip { text-decoration: none; }
+.plan-cards .mk { font-size: 0.75em; font-weight: 800; color: var(--good); }
+.l1-plan p { margin: 0; }
+.l1-badge { display: block; font-style: normal; font-size: 0.78rem; font-weight: 800; color: var(--cat-ink, var(--accent)); }
 .checkup { max-width: 640px; margin: 0 auto; display: grid; gap: 12px; }
 .checkup h1, .checkup h2 { margin: 0.2em 0 0; }
 .checkup-tips { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }

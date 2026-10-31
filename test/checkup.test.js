@@ -51,3 +51,13 @@ test("low-confidence words count as unclear, missing words count half", () => {
   assert.equal(l.score, 0.5);
   assert.equal(red.score, 0.5); // "red" missing
 });
+
+test("first-language sounds win ties but never outrank stronger evidence", () => {
+  // she → see (sh: 1 of 2) and cheap → sheep (ch: 1 of 2): a tie.
+  const tie = [{ index: 3, text: "Then see sells sheep shoes at the beach." }];
+  assert.equal(analyzeCheckup(tie).suggested[0], "sh");
+  assert.equal(analyzeCheckup(tie, { prefer: ["ch"] }).suggested[0], "ch");
+  // sh missed twice beats a preferred ch missed once.
+  const strong = [{ index: 3, text: "Then see sells sheep sues at the beach." }];
+  assert.equal(analyzeCheckup(strong, { prefer: ["ch"] }).suggested[0], "sh");
+});

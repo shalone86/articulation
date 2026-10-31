@@ -4,6 +4,7 @@ import { PHONEMES, phonemeById, phonemeWords, MANNERS } from "./data/phonemes.js
 import { GRAPHEMES, GRAPHEME_TYPES } from "./data/graphemes.js";
 import { settings, allCardProgress, checkup } from "./store.js";
 import { languageName } from "./data/languages.js";
+import { l1Focus } from "./data/l1-focus.js";
 
 /** Color family for a card: plosive | fricative | affricate | nasal | liquid | vowel | rvowel | spelling */
 export function category(p) {
@@ -83,7 +84,13 @@ export const DECKS = [
     describe: () => settings().language
       ? `Sounds that are often tricky for ${languageName(settings().language)} speakers.`
       : "Pick your first language in Settings to get a personal deck.",
-    cards: () => SOUND_CARDS.filter((c) => settings().language && c.p.esl?.[settings().language]),
+    cards: () => {
+      const lang = settings().language;
+      if (!lang) return [];
+      // The language's "start here" sounds first, in order, then every other sound with a note.
+      const first = (l1Focus(lang)?.sounds ?? []).map((id) => SOUND_CARDS.find((c) => c.p.id === id)).filter(Boolean);
+      return [...first, ...SOUND_CARDS.filter((c) => !first.includes(c) && c.p.esl?.[lang])];
+    },
   },
   {
     id: "review", name: "Needs practice", emoji: "🔁", cat: "nasal", group: "For you",

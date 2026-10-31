@@ -2,6 +2,7 @@
 
 import { PHONEMES, phonemeById, MANNERS } from "./data/phonemes.js";
 import { LANGUAGES, languageName } from "./data/languages.js";
+import { l1Focus } from "./data/l1-focus.js";
 import { LESSONS, lessonById } from "./data/lessons.js";
 import { HOMOPHONES, HETERONYMS } from "./data/homophones.js";
 import { DECKS, deckById, cardById, ALL_CARDS, GRAPHEME_TYPES } from "./decks.js";
@@ -205,6 +206,7 @@ async function viewHome() {
       ${lastCard ? `<a class="continue" data-cat="${lastCard.cat}" href="#/card/${last.deck}/${lastCard.id}">
         <span class="mini-glyph">${esc(shortLabel(lastCard))}</span><span><small>Continue</small><b>${esc(deckById[last.deck]?.name ?? "")}</b></span><span aria-hidden="true">→</span></a>` : ""}
       ${ck ? planHtml(ck) : !isNew ? `<a class="checkup-link" href="#/checkup">🩺 Not sure where to start? Take the 2-minute sentence checkup →</a>` : ""}
+      ${lang && !isNew ? l1Html(lang, ck) : ""}
       <div id="backend" class="backend muted small">Checking speech checker…</div>
     </section>
     <section class="tiles">
@@ -1033,6 +1035,7 @@ async function viewSettings() {
         <label>First language (for ESL tips)
           <select id="language"><option value="">English / not set</option>${LANGUAGES.map((l) => `<option value="${l.id}" ${l.id === s.language ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select>
         </label>
+        <div id="l1-preview">${s.language ? l1Html(s.language, store.checkup()) : ""}</div>
         <label class="check"><input type="checkbox" id="showIpa" ${s.showIpa ? "checked" : ""}> Show IPA symbols (like /θ/)</label>
         <label class="check"><input type="checkbox" id="kidMode" ${s.kidMode ? "checked" : ""}> Kid mode (bigger buttons)</label>
       </fieldset>
@@ -1069,6 +1072,9 @@ async function viewSettings() {
     if (confirm(`Remove ${store.currentLearner()} and their progress?`)) { store.removeLearner(store.currentLearner()); viewSettings(); }
   });
   for (const id of ["language", "ttsSource", "serverVoice", "voice"]) on(id, "change", (e) => store.setSetting(id, e.target.value));
+  on("language", "change", (e) => {
+    document.getElementById("l1-preview").innerHTML = e.target.value ? l1Html(e.target.value, store.checkup()) : "";
+  });
   for (const id of ["showIpa", "kidMode"]) on(id, "change", (e) => { store.setSetting(id, e.target.checked); applyLook(); });
   on("rate", "input", (e) => { store.setSetting("rate", +e.target.value); document.getElementById("rate-out").textContent = e.target.value; });
   on("passcode", "change", async (e) => { store.setSetting("passcode", e.target.value.trim()); await showHealth(true); });
@@ -1095,6 +1101,22 @@ async function showHealth(force) {
 }
 
 // ───────────────────────── sentence checkup ─────────────────────────
+/** "Start here" box for the learner's first language. Sounds the checkup also flagged get a ✓. */
+function l1Html(lang, ck, { heading = true } = {}) {
+  const f = l1Focus(lang);
+  if (!f) return "";
+  const confirmed = new Set(ck?.suggested ?? []);
+  const cards = f.sounds.map((id) => cardById[`s-${id}`]).filter(Boolean);
+  return `<div class="plan l1-plan">
+    ${heading ? `<div class="plan-head"><b>🌍 Start here for ${esc(languageName(lang))} speakers</b><a class="small" href="#/deck/focus">All ${esc(languageName(lang))} tips</a></div>` : ""}
+    <p class="small muted">${esc(f.why)}</p>
+    <div class="plan-cards">${cards.map((c) =>
+      `<a class="chip" data-cat="${c.cat}" href="#/card/focus/${c.id}"${confirmed.has(c.p.id) ? ` title="Your checkup flagged this one too"` : ""}>${esc(c.big)}${c.ipa && store.settings().showIpa ? ` <span class="ipa">/${esc(c.ipa)}/</span>` : ""}${confirmed.has(c.p.id) ? ` <span class="mk">✓ checkup</span>` : ""}</a>`).join("")}
+</div>
+    <p class="small l1-lessons">📘 ${f.lessons.filter((id) => lessonById[id]).map((id) => `<a href="#/learn/${id}">${esc(lessonById[id].title)}</a>`).join(" · ")}</p>
+  </div>`;
+}
+
 /** "Your practice plan" box: the checkup's suggested sounds and word-pattern lessons. */
 function planHtml(ck) {
   const cards = ck.suggested.map((id) => cardById[`s-${id}`]).filter(Boolean);
@@ -1224,9 +1246,12 @@ function renderCheckupResults() {
       <a class="btn primary" href="#/checkup">Try again</a> <a class="btn" href="#/">Home</a></div>`);
     return;
   }
-  const r = (ck.result ??= analyzeCheckup(ck.takes));
+  const r = (ck.result ??= analyzeCheckup(ck.takes, { prefer: l1Focus(store.settings().language)?.sounds ?? [] }));
   store.setCheckup(r);
   const suggested = r.suggested.map((id) => cardById[`s-${id}`]).filter(Boolean);
+  const lang = store.settings().language;
+  const l1 = l1Focus(lang);
+  const common = new Set(l1?.sounds ?? []);
   const reason = (id) => r.sounds.find((x) => x.id === id).examples.slice(0, 3).map((e) =>
     e.status === "changed" ? `“${esc(e.word)}” sounded like “${esc(e.heard)}”` : e.status === "missed" ? `“${esc(e.word)}” didn’t come through` : `“${esc(e.word)}” was unclear`).join(" · ");
   const pct = r.total ? Math.round((r.clear / r.total) * 100) : 0;
@@ -1240,13 +1265,14 @@ function renderCheckupResults() {
         <div class="ck-results">${suggested.map((c) => `
           <a class="ck-result" data-cat="${c.cat}" href="#/card/checkup/${c.id}">
             <span class="mini-glyph">${esc(shortLabel(c))}</span>
-            <span><b>${esc(c.p.label)} ${ipa(c.ipa)}</b><small>${reason(c.p.id)}</small></span>
+            <span><b>${esc(c.p.label)} ${ipa(c.ipa)}</b>${common.has(c.p.id) ? `<em class="l1-badge">common for ${esc(languageName(lang))} speakers</em>` : ""}<small>${reason(c.p.id)}</small></span>
             <span aria-hidden="true">→</span>
           </a>`).join("")}</div>`
       : `<p>None of the test words stood out. Try the <a href="#/pairs">minimal pairs game</a> to train your ear, or practice the <a href="#/deck/vowels">vowels</a>.</p>`}
       ${r.patterns.length ? `<h2>Habits to know about</h2><div class="ck-results">${r.patterns.map((p) => `
         <a class="ck-result" href="#/learn/${p.lesson}"><span class="mini-glyph">📘</span>
           <span><b>${esc(p.name)}</b><small>${p.examples.slice(0, 3).map(esc).join(" · ")}</small></span><span aria-hidden="true">→</span></a>`).join("")}</div>` : ""}
+      ${l1 ? `<h2>Also common for ${esc(languageName(lang))} speakers</h2>${l1Html(lang, r, { heading: false })}` : ""}
       <div class="actions start">
         ${suggested.length ? `<a class="btn primary big-btn" href="#/card/checkup/${suggested[0].id}">▶ Start practicing</a>` : ""}
         <a class="btn" href="#/">Home</a>

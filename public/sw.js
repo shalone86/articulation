@@ -5,7 +5,7 @@
 // Strategy: network first for the app (so updates show up right away),
 // falling back to the cache when offline; cache first for fonts and voice clips.
 
-const VERSION = "v3";
+const VERSION = "v4";
 const SHELL = `shell-${VERSION}`;
 const RUNTIME = "runtime-v1";
 
@@ -16,7 +16,7 @@ const ASSETS = [
   "js/app.js", "js/api.js", "js/audio.js", "js/checkup.js", "js/decks.js", "js/score.js", "js/search.js",
   "js/store.js", "js/tts.js", "js/wav.js",
   "js/data/phonemes.js", "js/data/graphemes.js", "js/data/lessons.js",
-  "js/data/homophones.js", "js/data/languages.js",
+  "js/data/homophones.js", "js/data/languages.js", "js/data/l1-focus.js",
 ];
 
 self.addEventListener("install", (e) => {

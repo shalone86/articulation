@@ -40,3 +40,16 @@ test("homophone index is symmetric", () => {
     assert.ok(homophonesOf(a).includes(b) && homophonesOf(b).includes(a), `${a}/${b}`);
   }
 });
+
+import { L1_FOCUS } from "../public/js/data/l1-focus.js";
+import { lessonById } from "../public/js/data/lessons.js";
+
+test("every first language has a valid start-here list", () => {
+  for (const l of LANGUAGES) {
+    const f = L1_FOCUS[l.id];
+    assert.ok(f, `no L1 focus for ${l.id}`);
+    assert.ok(f.why && f.sounds.length >= 4, l.id);
+    for (const id of f.sounds) assert.ok(phonemeById[id], `${l.id} → unknown sound ${id}`);
+    for (const id of f.lessons) assert.ok(lessonById[id], `${l.id} → unknown lesson ${id}`);
+  }
+});
