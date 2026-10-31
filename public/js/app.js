@@ -360,11 +360,9 @@ function showCard(card, { crumbs, count = "", prev, next }) {
       ${next ? `<a class="btn bar-nav" data-go="next" href="${next}" aria-label="Next card">▶</a>` : ""}
     </div>
   `);
-  const arrived = !!slide; // came here with next/prev, so the learner wants to hear the new word
   slide = "";
   renderFront();
   renderBack();
-  if (arrived && store.settings().autoSay) speak(start).catch(() => { /* autoplay blocked: the 🔊 button still works */ });
   // Warm the voice for this card once the learner stops on it (not while paging quickly).
   const mine = cs;
   setTimeout(() => cs === mine && prefetch([mine.target, card.sentence].filter(Boolean)), 600);
@@ -848,6 +846,7 @@ function nextPair() {
       <button class="btn" data-say="${esc(target)}" data-slow="1">🐢 Slow</button>
       <div class="choices">${shuffle([pair.a, pair.b]).map((w) => `<button class="choice" data-choice="${esc(w)}">${esc(w)}</button>`).join("")}</div>
       <div id="pair-fb" aria-live="polite"></div>`;
+    autoSay(target);
     game.querySelectorAll("[data-choice]").forEach((b) => (b.onclick = () => {
       if (ps.round.answered) return;
       ps.round.answered = true;
@@ -940,6 +939,11 @@ function viewHomophones() {
   homophoneQuiz();
 }
 
+/** Listening games play the word as soon as it appears (cards don't: the learner tries first). */
+function autoSay(word) {
+  if (store.settings().autoSay) speak(word).catch(() => { /* autoplay blocked: the 🔊 button still works */ });
+}
+
 function homophoneQuiz() {
   const group = pick(HOMOPHONES);
   const [word, meaning] = pick(group);
@@ -948,6 +952,7 @@ function homophoneQuiz() {
     <p class="prompt">Which spelling means <b>“${esc(meaning)}”</b>? ${say(word, "hear it")}</p>
     <div class="choices">${shuffle(group).map(([w]) => `<button class="choice" data-h="${esc(w)}">${esc(w)}</button>`).join("")}</div>
     <div id="h-fb"></div>`;
+  autoSay(word);
   el.querySelectorAll("[data-h]").forEach((b) => (b.onclick = () => {
     const ok = b.dataset.h === word;
     b.classList.add(ok ? "right" : "wrong");
@@ -1013,7 +1018,7 @@ async function viewSettings() {
   const voices = browserVoices();
   const h = await health();
   const serverVoices = h.voices?.length ? h.voices
-    : ["thalia", "asteria", "luna", "athena", "helena", "aurora", "iris", "cora", "apollo", "arcas", "orion", "zeus"];
+    : ["helena", "thalia", "asteria", "luna", "athena", "aurora", "iris", "cora", "apollo", "arcas", "orion", "zeus"];
   render(`
     <nav class="crumbs"><a href="#/">Home</a> › Settings</nav>
     <h1>⚙️ Settings</h1>
@@ -1040,7 +1045,7 @@ async function viewSettings() {
         <div id="l1-preview">${s.language ? l1Html(s.language, store.checkup()) : ""}</div>
         <label class="check"><input type="checkbox" id="showIpa" ${s.showIpa ? "checked" : ""}> Show IPA symbols (like /θ/)</label>
         <label class="check"><input type="checkbox" id="kidMode" ${s.kidMode ? "checked" : ""}> Kid mode (bigger buttons)</label>
-        <label class="check"><input type="checkbox" id="autoSay" ${s.autoSay ? "checked" : ""}> Say each word when I go to the next card</label>
+        <label class="check"><input type="checkbox" id="autoSay" ${s.autoSay ? "checked" : ""}> Play the word right away in Pairs and Homophones</label>
       </fieldset>
       <fieldset><legend>Voice</legend>
         <label>Voice source

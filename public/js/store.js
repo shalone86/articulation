@@ -10,8 +10,8 @@ const DEFAULTS = {
     showIpa: true,
     ttsSource: "auto", // auto | server | browser
     voice: "", // browser voice name
-    serverVoice: "thalia",
-    autoSay: true, // say the word when moving to the next card
+    serverVoice: "helena",
+    autoSay: true, // play the word right away in Pairs and Homophones
     rate: 0.9,
     passcode: "",
     kidMode: false,
@@ -26,7 +26,12 @@ let state = load();
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) ?? "null");
-    if (s) return { ...DEFAULTS, ...s, settings: { ...DEFAULTS.settings, ...s.settings } };
+    if (s) {
+      // Earlier default voices → the current one (once, so a voice picked later sticks).
+      if (!s.settings?.voiceV3 && ["asteria", "thalia"].includes(s.settings?.serverVoice)) delete s.settings.serverVoice;
+      if (s.settings) s.settings.voiceV3 = true;
+      return { ...DEFAULTS, ...s, settings: { ...DEFAULTS.settings, ...s.settings } };
+    }
   } catch { /* private mode or corrupted — fall through */ }
   return structuredClone(DEFAULTS);
 }

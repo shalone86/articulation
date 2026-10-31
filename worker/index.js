@@ -2,7 +2,7 @@
 //
 //   GET  /api/health      → { stt, tts, backend, model }
 //   POST /api/transcribe  → body: audio/wav (16 kHz mono) → { text, words }
-//   GET  /api/tts?text=…&voice=thalia → audio/mpeg
+//   GET  /api/tts?text=…&voice=helena → audio/mpeg
 //
 //   GET  /.well-known/assetlinks.json → proves the Android app owns this site (see docs/ANDROID.md)
 //
@@ -16,8 +16,8 @@
 
 const STT_MODEL = "@cf/openai/whisper-large-v3-turbo";
 const TTS_MODEL = "@cf/deepgram/aura-2-en";
-// Aura-2 English voices, the clearest first (the Settings list shows them in this order).
-const TTS_VOICE_LIST = ["thalia", "asteria", "luna", "athena", "helena", "aurora", "iris", "cora", "delia", "harmonia",
+// Aura-2 English voices, the default (helena) first (the Settings list shows them in this order).
+const TTS_VOICE_LIST = ["helena", "thalia", "asteria", "luna", "athena", "aurora", "iris", "cora", "delia", "harmonia",
   "andromeda", "amalthea", "callista", "cordelia", "electra", "hera", "juno", "minerva", "ophelia", "pandora", "phoebe",
   "theia", "vesta", "apollo", "arcas", "aries", "atlas", "draco", "hermes", "hyperion", "janus", "jupiter", "mars",
   "neptune", "odysseus", "orion", "orpheus", "pluto", "saturn", "zeus"];
@@ -122,7 +122,7 @@ function assetLinks(env) {
 async function tts(request, url, env, ctx) {
   const text = (url.searchParams.get("text") ?? "").trim().slice(0, 300);
   if (!text) return json({ error: "missing text" }, 400);
-  const voice = TTS_VOICES.has(url.searchParams.get("voice")) ? url.searchParams.get("voice") : "thalia";
+  const voice = TTS_VOICES.has(url.searchParams.get("voice")) ? url.searchParams.get("voice") : "helena";
 
   // Same text + voice → same audio, so cache it at the edge.
   const cacheKey = new Request(`https://tts.cache/aura-2/${voice}/${encodeURIComponent(text)}`);
