@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy · Articulation Workshop</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <style>
+    :root { --bg: #fff6e8; --fg: #2d2340; --muted: #6f6680; --accent: #e2512e; color-scheme: light; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #1d1830; --fg: #fbf3ff; --muted: #b9aecb; --accent: #ff9877; color-scheme: dark; } }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 17px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 680px; margin: 0 auto; padding: 32px max(16px, env(safe-area-inset-left)); }
+    h1 { line-height: 1.15; } h2 { margin-top: 1.8em; font-size: 1.2rem; }
+    a { color: var(--accent); } .muted { color: var(--muted); }
+  </style>
+</head>
+<body>
+<main>
+  <p><a href="./">← Back to the app</a></p>
+  <h1>Privacy policy</h1>
+  <p class="muted">Articulation Workshop · last updated October 31, 2026</p>
+
+  <p>Articulation Workshop is a pronunciation practice app for English learners and children. It has no accounts, no ads and no analytics or tracking.</p>
+
+  <h2>Voice recordings</h2>
+  <p>When you tap the microphone, your recording is sent over an encrypted connection to the app’s speech checker, which turns it into text so the app can tell you what it heard. Recordings are processed only to answer that request and are <b>not stored, shared, or used to train models</b> by this app. The speech checker runs on the app’s own server (hosted on Hugging Face Spaces) or on Cloudflare Workers AI; Cloudflare states it does not use this content to train its models.</p>
+  <p>Your own recording also stays on your device until you leave the card, so you can play it back. It is never uploaded anywhere else.</p>
+
+  <h2>Progress and settings</h2>
+  <p>Learner names, progress, stars and settings are saved only on your device (in the browser’s storage). They are never sent to a server. You can download or delete them in Settings.</p>
+
+  <h2>Spoken words</h2>
+  <p>When the app reads a word aloud with its server voice, the word’s text (never your recording) is sent to the voice service. You can switch to your device’s own voice in Settings.</p>
+
+  <h2>Children</h2>
+  <p>The app is designed to be used by children with a parent, teacher or speech therapist. It collects no personal information: no names leave the device, and recordings are not kept.</p>
+
+  <h2>Contact</h2>
+  <p>Questions: <b>[your contact email]</b></p>
+</main>
+</body>
+</html>

@@ -5,8 +5,16 @@ import { GRAPHEMES, GRAPHEME_TYPES } from "./data/graphemes.js";
 import { settings, allCardProgress } from "./store.js";
 import { languageName } from "./data/languages.js";
 
+/** Color family for a card: plosive | fricative | affricate | nasal | liquid | vowel | rvowel | spelling */
+export function category(p) {
+  if (!p) return "spelling";
+  if (p.manner) return p.manner === "glide" ? "liquid" : p.manner;
+  return p.group === "r-vowel" ? "rvowel" : "vowel";
+}
+
 function soundCard(p) {
   return {
+    cat: category(p),
     id: `s-${p.id}`,
     kind: "sound",
     big: p.label,
@@ -25,6 +33,7 @@ function spellingCard(g) {
   return {
     id: g.id,
     kind: "spelling",
+    cat: "spelling",
     big: g.g,
     words: g.words,
     sentence: g.sentence,
@@ -42,9 +51,9 @@ const sounds = (pred) => () => SOUND_CARDS.filter((c) => pred(c.p));
 const spellings = (...types) => () => SPELLING_CARDS.filter((c) => types.includes(c.g.type));
 
 export const DECKS = [
-  { id: "consonants", name: "Consonant sounds", emoji: "🅱️", group: "Sounds", cards: sounds((p) => p.group === "consonant") },
-  { id: "vowels", name: "Vowel sounds", emoji: "🅰️", group: "Sounds", cards: sounds((p) => p.group === "vowel" || p.group === "diphthong") },
-  { id: "r-vowels", name: "R-controlled vowels", emoji: "🏴‍☠️", group: "Sounds", cards: sounds((p) => p.group === "r-vowel") },
+  { id: "consonants", name: "Consonant sounds", emoji: "🅱️", cat: "plosive", group: "Sounds", cards: sounds((p) => p.group === "consonant") },
+  { id: "vowels", name: "Vowel sounds", emoji: "🅰️", cat: "vowel", group: "Sounds", cards: sounds((p) => p.group === "vowel" || p.group === "diphthong") },
+  { id: "r-vowels", name: "R-controlled vowels", emoji: "🏴‍☠️", cat: "rvowel", group: "Sounds", cards: sounds((p) => p.group === "r-vowel") },
   ...Object.entries(MANNERS)
     .filter(([m]) => m !== "glide")
     .map(([m, info]) => ({
@@ -52,24 +61,25 @@ export const DECKS = [
       name: m === "liquid" ? "Liquids & glides" : info.name,
       emoji: { plosive: "💥", fricative: "🌬️", affricate: "🚂", nasal: "👃", liquid: "🌊" }[m],
       group: "Sounds by type",
+      cat: m,
       cards: sounds((p) => p.manner === m || (m === "liquid" && p.manner === "glide")),
     })),
-  { id: "voicing", name: "Voiced/voiceless partners", emoji: "🐝", group: "Sounds by type", cards: sounds((p) => !!p.partner) },
-  { id: "digraphs", name: "Consonant digraphs", emoji: "🔠", group: "Spellings", cards: spellings("consonant-digraph", "glued") },
-  { id: "trigraphs", name: "Trigraphs & quadgraphs", emoji: "🔡", group: "Spellings", cards: spellings("trigraph", "quadgraph") },
-  { id: "vowel-teams", name: "Vowel teams", emoji: "👯", group: "Spellings", cards: spellings("vowel-digraph") },
-  { id: "magic-e", name: "Magic e", emoji: "🪄", group: "Spellings", cards: spellings("split-digraph") },
-  { id: "bossy-r", name: "Bossy R spellings", emoji: "🦖", group: "Spellings", cards: spellings("r-controlled") },
-  { id: "silent", name: "Silent letters", emoji: "🤫", group: "Spellings", cards: spellings("silent") },
+  { id: "voicing", name: "Voiced/voiceless partners", emoji: "🐝", cat: "fricative", group: "Sounds by type", cards: sounds((p) => !!p.partner) },
+  { id: "digraphs", name: "Consonant digraphs", emoji: "🔠", cat: "spelling", group: "Spellings", cards: spellings("consonant-digraph", "glued") },
+  { id: "trigraphs", name: "Trigraphs & quadgraphs", emoji: "🔡", cat: "spelling", group: "Spellings", cards: spellings("trigraph", "quadgraph") },
+  { id: "vowel-teams", name: "Vowel teams", emoji: "👯", cat: "spelling", group: "Spellings", cards: spellings("vowel-digraph") },
+  { id: "magic-e", name: "Magic e", emoji: "🪄", cat: "spelling", group: "Spellings", cards: spellings("split-digraph") },
+  { id: "bossy-r", name: "Bossy R spellings", emoji: "🦖", cat: "spelling", group: "Spellings", cards: spellings("r-controlled") },
+  { id: "silent", name: "Silent letters", emoji: "🤫", cat: "spelling", group: "Spellings", cards: spellings("silent") },
   {
-    id: "focus", name: "My focus sounds", emoji: "🎯", group: "For you",
+    id: "focus", name: "My focus sounds", emoji: "🎯", cat: "affricate", group: "For you",
     describe: () => settings().language
       ? `Sounds that are often tricky for ${languageName(settings().language)} speakers.`
       : "Pick your first language in Settings to get a personal deck.",
     cards: () => SOUND_CARDS.filter((c) => settings().language && c.p.esl?.[settings().language]),
   },
   {
-    id: "review", name: "Needs practice", emoji: "🔁", group: "For you",
+    id: "review", name: "Needs practice", emoji: "🔁", cat: "nasal", group: "For you",
     describe: () => "Cards where your last try didn’t match.",
     cards: () => {
       const prog = allCardProgress();

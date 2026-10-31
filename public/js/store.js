@@ -14,7 +14,9 @@ const DEFAULTS = {
     rate: 0.9,
     passcode: "",
     kidMode: false,
+    look: "playroom", // playroom | studio | pop
   },
+  last: null, // { deck, card } — "continue where you left off"
   progress: {}, // learner → { cards: { cardId: {tries, wins, last, at, words: {w: [tries, wins]}} }, pairs: {tries, wins} }
 };
 
@@ -34,6 +36,9 @@ function save() {
 
 export const settings = () => state.settings;
 export function setSetting(k, v) { state.settings[k] = v; save(); }
+
+export const lastCard = () => state.last;
+export function setLastCard(deck, card) { state.last = { deck, card }; save(); }
 
 export const learners = () => state.learners;
 export const currentLearner = () => state.current;

@@ -1,11 +1,26 @@
 {
+  "id": "./",
   "name": "Articulation Workshop",
   "short_name": "Articulation",
+  "description": "Pronunciation practice for English learners and kids: flip cards for every English sound and spelling, with recording, listening and a speech checker.",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#f7f7fb",
-  "theme_color": "#4f46e5",
+  "orientation": "portrait",
+  "background_color": "#fff6e8",
+  "theme_color": "#ff7a59",
+  "categories": ["education", "kids"],
+  "lang": "en-US",
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Sound cards", "url": "./#/deck/consonants", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Minimal pairs", "url": "./#/pairs", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Search", "url": "./#/search", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }

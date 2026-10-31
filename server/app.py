@@ -17,6 +17,8 @@ Environment:
     PIPER_VOICE      optional Piper TTS voice (e.g. en_US-lessac-medium, or a path to
                      an .onnx file) for a consistent server voice; downloaded on first use
     PIPER_DIR        where Piper voices are stored (default: ./voices)
+    ANDROID_PACKAGE, ANDROID_SHA256   optional; serve /.well-known/assetlinks.json for
+                     the Android app (see docs/ANDROID.md)
 """
 
 import io
@@ -63,6 +65,21 @@ async def passcode(request: Request, call_next):
     if PASSCODE and request.url.path.startswith("/api/") and request.headers.get("x-app-passcode") != PASSCODE:
         return JSONResponse({"error": "passcode required"}, status_code=401)
     return await call_next(request)
+
+
+@app.get("/.well-known/assetlinks.json")
+def asset_links():
+    package, sha = os.environ.get("ANDROID_PACKAGE"), os.environ.get("ANDROID_SHA256")
+    if not package or not sha:
+        return []
+    return [{
+        "relation": ["delegate_permission/common.handle_all_urls"],
+        "target": {
+            "namespace": "android_app",
+            "package_name": package,
+            "sha256_cert_fingerprints": [s.strip() for s in sha.split(",")],
+        },
+    }]
 
 
 @app.get("/api/health")

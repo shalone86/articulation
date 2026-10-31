@@ -1,29 +1,45 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-look="playroom">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Articulation Workshop</title>
   <meta name="description" content="Pronunciation practice for English learners and kids: flip cards for every English sound and spelling, with recording, listening and a speech checker.">
-  <meta name="theme-color" content="#4f46e5">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗣️</text></svg>">
+  <meta name="theme-color" content="#ff7a59">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/looks.css">
 </head>
 <body>
+  <a class="skip" href="#app">Skip to content</a>
   <header class="topbar">
-    <a href="#/" class="brand">🗣️ <span>Articulation Workshop</span></a>
-    <nav class="nav">
-      <a href="#/deck/consonants">Cards</a>
-      <a href="#/pairs">Pairs</a>
-      <a href="#/learn">Learn</a>
-      <a href="#/progress">Progress</a>
-      <a href="#/settings" aria-label="Settings">⚙️</a>
+    <a href="#/" class="brand" aria-label="Articulation Workshop home"><span class="logo" aria-hidden="true"></span><span class="brand-name">Articulation</span></a>
+    <form class="top-search" id="top-search" role="search">
+      <input name="q" type="search" placeholder="Search words & sounds" aria-label="Search words and sounds" autocomplete="off">
+    </form>
+    <nav class="nav" aria-label="Main">
+      <a href="#/deck/consonants" data-nav="deck card c word">Cards</a>
+      <a href="#/pairs" data-nav="pairs">Pairs</a>
+      <a href="#/learn" data-nav="learn">Learn</a>
+      <a href="#/progress" data-nav="progress">Progress</a>
+      <a href="#/search" class="icon-link mobile-only" data-nav="search" aria-label="Search">🔎</a>
+      <a href="#/settings" class="icon-link" data-nav="settings" aria-label="Settings">⚙️</a>
     </nav>
   </header>
   <main id="app"><p class="muted">Loading…</p></main>
+  <nav class="tabbar" aria-label="Main">
+    <a href="#/" data-nav="home"><span aria-hidden="true">🏠</span>Home</a>
+    <a href="#/deck/consonants" data-nav="deck card c word"><span aria-hidden="true">🃏</span>Cards</a>
+    <a href="#/pairs" data-nav="pairs"><span aria-hidden="true">⇄</span>Pairs</a>
+    <a href="#/learn" data-nav="learn"><span aria-hidden="true">📚</span>Learn</a>
+    <a href="#/progress" data-nav="progress"><span aria-hidden="true">⭐</span>Me</a>
+  </nav>
   <footer class="foot muted small">
-    A practice tool, not a diagnosis. For speech concerns, talk to a speech-language pathologist.
+    A practice tool, not a diagnosis. For speech concerns, talk to a speech-language pathologist. · <a href="privacy.html">Privacy</a>
   </footer>
   <script type="module" src="js/app.js"></script>
 </body>

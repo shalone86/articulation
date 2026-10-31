@@ -6,9 +6,10 @@ import { LESSONS, lessonById } from "./data/lessons.js";
 import { HOMOPHONES, HETERONYMS } from "./data/homophones.js";
 import { DECKS, deckById, cardById, ALL_CARDS, GRAPHEME_TYPES } from "./decks.js";
 import { Recorder, micSupported } from "./audio.js";
-import { scoreWord, scoreSentence, isSuccess, candidatesFor, refineWithScores } from "./score.js";
-import { speak, playUrl, stop as stopAudio, browserVoices } from "./tts.js";
+import { scoreWord, scoreSentence, isSuccess, candidatesFor, refineWithScores, normalize } from "./score.js";
+import { speak, playUrl, stop as stopAudio, browserVoices, prefetch } from "./tts.js";
 import { health, transcribe } from "./api.js";
+import { search, cardsForWord, patternsIn } from "./search.js";
 import * as store from "./store.js";
 
 const $app = document.getElementById("app");
@@ -17,18 +18,57 @@ const shuffle = (a) => a.map((x) => [Math.random(), x]).sort((p, q) => p[0] - q[
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const ipa = (s) => (store.settings().showIpa && s ? `<span class="ipa">/${esc(s)}/</span>` : "");
 const say = (text, label = text, cls = "") =>
-  `<button class="say ${cls}" data-say="${esc(text)}" title="Hear “${esc(text)}”">🔊 ${esc(label)}</button>`;
+  `<button class="say ${cls}" data-say="${esc(text)}" title="Hear “${esc(text)}”"><span aria-hidden="true">🔊</span> ${esc(label)}</button>`;
 const pairBtns = ([a, b]) => `<span class="pair">${say(a)}<span class="vs">vs</span>${say(b)}</span>`;
-const stars = (n) => `<span class="stars" aria-label="${n} of 3 stars">${"★".repeat(n)}${"☆".repeat(3 - n)}</span>`;
+const stars = (n) => `<span class="stars" aria-label="${n} of 3 stars">${"★".repeat(n)}<span class="off">${"★".repeat(3 - n)}</span></span>`;
+const CAT_NAMES = { plosive: "Plosive", fricative: "Fricative", affricate: "Affricate", nasal: "Nasal", liquid: "Liquid / glide", vowel: "Vowel", rvowel: "R-controlled vowel", spelling: "Spelling" };
+const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const recorder = new Recorder();
+
+// ───────────────────────── looks (themes) ─────────────────────────
+export const LOOKS = {
+  playroom: {
+    name: "Playroom", blurb: "Warm, bouncy and colorful — made for kids.",
+    fonts: "family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800",
+  },
+  studio: {
+    name: "Studio", blurb: "Calm and editorial — focused practice for adults.",
+    fonts: "family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600",
+  },
+  pop: {
+    name: "Pop", blurb: "Bold stickers and thick outlines — loud and fun.",
+    fonts: "family=Archivo+Black&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700",
+  },
+};
+
+let lookOverride = null; // from ?look=… — previews a look without saving it
+
+function applyLook() {
+  const s = store.settings();
+  const want = lookOverride ?? s.look;
+  const look = LOOKS[want] ? want : "playroom";
+  document.documentElement.dataset.look = look;
+  document.body.classList.toggle("kid", !!s.kidMode);
+  let link = document.getElementById("look-fonts");
+  if (!link) {
+    link = document.createElement("link");
+    link.id = "look-fonts";
+    link.rel = "stylesheet";
+    document.head.append(link);
+  }
+  const href = `https://fonts.googleapis.com/css2?${LOOKS[look].fonts}&display=swap`;
+  if (link.href !== href) link.href = href;
+}
 
 // ───────────────────────── router ─────────────────────────
 const routes = [
   [/^$/, viewHome],
   [/^deck\/([\w-]+)$/, viewDeck],
-  [/^card\/([\w-]+)\/(\d+)$/, viewCard],
-  [/^c\/([\w-]+)$/, (id) => openCard(id)],
+  [/^card\/([\w-]+)\/([\w-]+)$/, viewCard],
+  [/^c\/([\w-]+)$/, openCard],
+  [/^word\/(.+)$/, (w) => viewWord(decodeURIComponent(w))],
+  [/^search$/, viewSearch],
   [/^learn$/, viewLearn],
   [/^learn\/([\w-]+)$/, viewLesson],
   [/^pairs$/, viewPairs],
@@ -38,19 +78,27 @@ const routes = [
   [/^settings$/, viewSettings],
 ];
 
+let query = new URLSearchParams();
+
 function route() {
   recorder.cancel();
   stopAudio();
-  const path = location.hash.replace(/^#\/?/, "");
+  const [path, qs = ""] = location.hash.replace(/^#\/?/, "").split("?");
+  query = new URLSearchParams(qs);
   for (const [re, fn] of routes) {
     const m = path.match(re);
-    if (m) {
+    if (!m) continue;
+    try {
       fn(...m.slice(1));
-      document.querySelectorAll(".nav a").forEach((a) =>
-        a.classList.toggle("active", path.startsWith(a.getAttribute("href").slice(2) || "\u0000")));
-      window.scrollTo(0, 0);
-      return;
+    } catch (e) {
+      console.error(e);
+      render(`<div class="empty"><p>Something went wrong showing this page.</p><p class="muted small">${esc(e.message)}</p><a class="btn primary" href="#/">Go home</a></div>`);
     }
+    const section = path.split("/")[0];
+    document.querySelectorAll("[data-nav]").forEach((a) =>
+      a.classList.toggle("active", a.dataset.nav.split(" ").includes(section || "home")));
+    if (!path.startsWith("search")) window.scrollTo(0, 0);
+    return;
   }
   location.hash = "#/";
 }
@@ -64,56 +112,113 @@ document.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-say]");
   if (!b) return;
   e.preventDefault();
+  document.querySelectorAll(".playing").forEach((x) => x.classList.remove("playing"));
   b.classList.add("playing");
   try { await speak(b.dataset.say, { slow: b.dataset.slow === "1" }); }
-  catch (err) { toast(err.message); }
+  catch (err) { toast(`🔇 ${err.message}`); }
   finally { b.classList.remove("playing"); }
 });
 
 function toast(msg) {
+  document.querySelector(".toast")?.remove();
   const t = document.createElement("div");
   t.className = "toast";
+  t.setAttribute("role", "status");
   t.textContent = msg;
   document.body.append(t);
   setTimeout(() => t.remove(), 4000);
 }
 
+function celebrate(anchor) {
+  if (reducedMotion() || !anchor) return;
+  const r = anchor.getBoundingClientRect();
+  const layer = document.createElement("div");
+  layer.className = "confetti";
+  layer.style.left = `${r.left + r.width / 2}px`;
+  layer.style.top = `${r.top + r.height / 2}px`;
+  for (let i = 0; i < 26; i++) {
+    const s = document.createElement("i");
+    const a = (Math.PI * 2 * i) / 26 + Math.random() * 0.4;
+    const d = 70 + Math.random() * 90;
+    s.style.setProperty("--x", `${Math.cos(a) * d}px`);
+    s.style.setProperty("--y", `${Math.sin(a) * d - 40}px`);
+    s.style.setProperty("--r", `${Math.random() * 540 - 270}deg`);
+    s.style.setProperty("--c", `var(--cat-${pick(["plosive", "fricative", "affricate", "nasal", "liquid", "vowel", "rvowel"])})`);
+    layer.append(s);
+  }
+  document.body.append(layer);
+  setTimeout(() => layer.remove(), 1300);
+}
+
+// Header search box (desktop) and the search icon (mobile) both lead to #/search.
+document.getElementById("top-search")?.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const q = e.target.q.value.trim();
+  location.hash = `#/search${q ? `?q=${encodeURIComponent(q)}` : ""}`;
+});
+
 // ───────────────────────── home ─────────────────────────
+function deckProgress(d) {
+  const cards = d.cards();
+  if (!cards.length) return 0;
+  return cards.reduce((a, c) => a + store.stars(c.id), 0) / (cards.length * 3);
+}
+
 async function viewHome() {
   const lang = store.settings().language;
+  const last = store.lastCard();
+  const lastCard = last && cardById[last.card];
   const groups = [...new Set(DECKS.map((d) => d.group))];
   render(`
     <section class="hero">
-      <h1>Hi, ${esc(store.currentLearner())}! 👋</h1>
-      <p>Pick a deck. On each card, <b>🎤 record your try</b>, then <b>flip it 👂 to hear it said</b> the right way.</p>
-      <div id="backend" class="backend muted">Checking speech checker…</div>
+      <div class="hero-text">
+        <h1>Hi, ${esc(store.currentLearner())}! <span class="wave" aria-hidden="true">👋</span></h1>
+        <p>Pick a card. <b>🎤 Try it</b>, then <b>👂 listen</b> to how it should sound.</p>
+      </div>
+      <form class="search-box" id="home-search" role="search">
+        <span aria-hidden="true">🔎</span>
+        <input name="q" type="search" placeholder="Find a word or sound — “thumb”, “igh”, “schwa”…" autocomplete="off" aria-label="Search words and sounds">
+      </form>
+      ${lastCard ? `<a class="continue" data-cat="${lastCard.cat}" href="#/card/${last.deck}/${lastCard.id}">
+        <span class="mini-glyph">${esc(lastCard.big)}</span><span><small>Continue</small><b>${esc(deckById[last.deck]?.name ?? "")}</b></span><span aria-hidden="true">→</span></a>` : ""}
+      <div id="backend" class="backend muted small">Checking speech checker…</div>
     </section>
     <section class="tiles">
-      <a class="tile big" href="#/deck/consonants"><span>🅱️</span>Consonants</a>
-      <a class="tile big" href="#/deck/vowels"><span>🅰️</span>Vowels</a>
-      <a class="tile big" href="#/deck/digraphs"><span>🔠</span>Digraphs</a>
-      <a class="tile big" href="#/pairs"><span>👂</span>Minimal pairs</a>
-      <a class="tile" href="#/learn"><span>📚</span>Learn how sounds work</a>
-      <a class="tile" href="#/chart"><span>🗺️</span>Spelling chart</a>
-      <a class="tile" href="#/homophones"><span>👯</span>Homophones</a>
-      <a class="tile" href="#/progress"><span>⭐</span>My progress</a>
+      <a class="tile" data-cat="plosive" href="#/deck/consonants"><span class="tile-icon">b</span><b>Consonants</b><small>24 sounds</small></a>
+      <a class="tile" data-cat="vowel" href="#/deck/vowels"><span class="tile-icon">a</span><b>Vowels</b><small>16 sounds</small></a>
+      <a class="tile" data-cat="spelling" href="#/deck/digraphs"><span class="tile-icon">sh</span><b>Spellings</b><small>digraphs & more</small></a>
+      <a class="tile" data-cat="liquid" href="#/pairs"><span class="tile-icon">⇄</span><b>Minimal pairs</b><small>ship · sheep</small></a>
     </section>
-    ${lang ? "" : `<p class="callout">🌍 Learning English as a new language? <a href="#/settings">Choose your first language</a> to see tips made for you and a personal focus deck.</p>`}
+    <section class="tiles small-tiles">
+      <a class="tile" data-cat="nasal" href="#/learn"><span>📚</span><b>Learn</b></a>
+      <a class="tile" data-cat="affricate" href="#/chart"><span>🗺️</span><b>Spelling chart</b></a>
+      <a class="tile" data-cat="rvowel" href="#/homophones"><span>👯</span><b>Homophones</b></a>
+      <a class="tile" data-cat="fricative" href="#/progress"><span>⭐</span><b>Progress</b></a>
+    </section>
+    ${lang ? "" : `<p class="callout">🌍 Learning English as a new language? <a href="#/settings">Choose your first language</a> for tips made for you and a personal focus deck.</p>`}
     ${groups.map((g) => `
       <h2>${esc(g)}</h2>
       <div class="deck-list">
         ${DECKS.filter((d) => d.group === g).map((d) => {
           const n = d.cards().length;
-          return `<a class="deck" href="#/deck/${d.id}"><span class="emoji">${d.emoji}</span><b>${esc(d.name)}</b><small>${n} card${n === 1 ? "" : "s"}</small></a>`;
+          const pct = Math.round(deckProgress(d) * 100);
+          return `<a class="deck" data-cat="${d.cat}" href="#/deck/${d.id}">
+            <span class="emoji" aria-hidden="true">${d.emoji}</span><b>${esc(d.name)}</b>
+            <small>${n} card${n === 1 ? "" : "s"}${pct ? ` · ${pct}%` : ""}</small>
+            <span class="bar" style="--p:${pct}%" aria-hidden="true"></span></a>`;
         }).join("")}
       </div>`).join("")}
   `);
+  document.getElementById("home-search").addEventListener("submit", (e) => {
+    e.preventDefault();
+    location.hash = `#/search?q=${encodeURIComponent(e.target.q.value.trim())}`;
+  });
   const h = await health();
   const el = document.getElementById("backend");
   if (!el) return;
   el.innerHTML = h.stt
-    ? `✅ Speech checker ready <small>(${esc(h.backend)} · ${esc(h.model)})</small>`
-    : `⚠️ Speech checker offline — you can still record and compare by ear. <small>${esc(h.error ?? "")}</small>`;
+    ? `<span class="dot ok"></span> Speech checker ready`
+    : `<span class="dot"></span> Speech checker offline — you can still record and compare by ear.`;
 }
 
 // ───────────────────────── deck ─────────────────────────
@@ -123,13 +228,15 @@ function viewDeck(id) {
   const cards = deck.cards();
   render(`
     <nav class="crumbs"><a href="#/">Home</a> › ${esc(deck.name)}</nav>
-    <h1>${deck.emoji} ${esc(deck.name)}</h1>
-    ${deck.describe ? `<p class="muted">${esc(deck.describe())}</p>` : ""}
-    ${cards.length ? `<a class="btn primary" href="#/card/${id}/0">▶ Start practicing</a>` : ""}
+    <div class="deck-head" data-cat="${deck.cat}">
+      <h1><span aria-hidden="true">${deck.emoji}</span> ${esc(deck.name)}</h1>
+      ${deck.describe ? `<p class="muted">${esc(deck.describe())}</p>` : ""}
+      ${cards.length ? `<a class="btn primary" href="#/card/${id}/${cards[0].id}">▶ Start practicing</a>` : ""}
+    </div>
     <div class="card-grid">
-      ${cards.map((c, i) => `
-        <a class="mini-card" href="#/card/${id}/${i}">
-          <span class="emoji">${c.emoji ?? ""}</span>
+      ${cards.map((c) => `
+        <a class="mini-card" data-cat="${c.cat}" href="#/card/${id}/${c.id}">
+          ${c.emoji ? `<span class="emoji" aria-hidden="true">${c.emoji}</span>` : ""}
           <b>${esc(c.big)}</b>
           ${c.ipa ? ipa(c.ipa) : ""}
           <small>${esc(c.words[0])}</small>
@@ -141,66 +248,137 @@ function viewDeck(id) {
 function openCard(cardId) {
   const deck = DECKS.find((d) => d.cards().some((c) => c.id === cardId));
   if (!deck) return (location.hash = "#/");
-  const i = deck.cards().findIndex((c) => c.id === cardId);
-  location.replace(`#/card/${deck.id}/${i}`);
+  const q = query.toString();
+  location.replace(`#/card/${deck.id}/${cardId}${q ? `?${q}` : ""}`);
 }
 
 // ───────────────────────── flip card ─────────────────────────
 let cs; // card view state
+let slide = ""; // "left" | "right": direction of the next card animation
 
-function viewCard(deckId, index) {
+function viewCard(deckId, ref) {
   const deck = deckById[deckId];
-  const cards = deck?.cards() ?? [];
-  index = +index;
-  if (!cards[index]) return (location.hash = `#/deck/${deckId}`);
-  const card = cards[index];
-  cs = { deck, cards, index, card, target: card.words[0], isSentence: false, flipped: false, take: null, result: null, busy: false };
-  const prev = (index - 1 + cards.length) % cards.length;
-  const next = (index + 1) % cards.length;
+  if (!deck) return (location.hash = "#/");
+  const cards = deck.cards();
+  // Card ids are stable; old links used positions, which shift in dynamic decks.
+  let index = /^\d+$/.test(ref) ? +ref : cards.findIndex((c) => c.id === ref);
+  const card = cards[index] ?? cardById[ref];
+  if (!card) return (location.hash = `#/deck/${deckId}`);
+  if (index < 0) index = 0; // e.g. a card that just left the "needs practice" deck
+  store.setLastCard(deck.id, card.id);
+  const n = cards.length;
+  const prev = n > 1 ? cards[(index - 1 + n) % n] : null;
+  const next = n > 1 ? cards[(cards[index] === card ? index + 1 : index) % n] : null;
+  showCard(card, {
+    crumbs: `<a href="#/">Home</a> › <a href="#/deck/${deck.id}">${esc(deck.name)}</a>`,
+    count: cards[index] === card ? `${index + 1} / ${n}` : "",
+    prev: prev && `#/card/${deck.id}/${prev.id}`,
+    next: next && `#/card/${deck.id}/${next.id}`,
+  });
+}
+
+/** A practice card for any word (from search). */
+function viewWord(word) {
+  word = word.trim();
+  const homes = cardsForWord(word);
+  const w = normalize(word);
+  const pairs = homes.flatMap((c) => c.pairs).filter((p) => p.some((x) => normalize(x) === w));
+  const patterns = patternsIn(word);
+  showCard({
+    id: `w-${w}`, kind: "word", cat: homes[0]?.cat ?? "spelling", big: word, words: [word], pairs, homes, patterns,
+  }, { crumbs: `<a href="#/">Home</a> › <a href="#/search?q=${encodeURIComponent(word)}">Search</a>` });
+}
+
+function showCard(card, { crumbs, count = "", prev, next }) {
+  const w = query.get("w");
+  const words = w && !card.words.some((x) => normalize(x) === normalize(w)) ? [w, ...card.words] : card.words;
+  card = { ...card, words };
+  const start = words.find((x) => normalize(x) === normalize(w ?? "")) ?? words[0];
+  cs = { card, target: start, isSentence: false, flipped: false, take: null, result: null, busy: false, tab: "how", prev, next };
   render(`
-    <nav class="crumbs"><a href="#/">Home</a> › <a href="#/deck/${deck.id}">${esc(deck.name)}</a> › ${index + 1} / ${cards.length}</nav>
-    <div class="card-nav">
-      <a class="btn" href="#/card/${deck.id}/${prev}" aria-label="Previous card">◀</a>
-      <div class="flip-scene"><div class="flip" id="flip">
+    <nav class="crumbs">${crumbs}</nav>
+    <div class="card-wrap" data-cat="${card.cat}">
+      <div class="card-toolbar">
+        <div class="seg side-switch" role="tablist" aria-label="Card side">
+          <button role="tab" aria-selected="true" data-side="front">🎤 Try it</button>
+          <button role="tab" aria-selected="false" data-side="back">👂 Listen</button>
+        </div>
+        <span class="count muted small">${count}</span>
+      </div>
+      <div class="flip-scene ${slide ? `enter-${slide}` : ""}" id="scene"><div class="flip" id="flip">
         <div class="face front" id="front"></div>
-        <div class="face back" id="back"></div>
+        <div class="face back" id="back" aria-hidden="true"></div>
       </div></div>
-      <a class="btn" href="#/card/${deck.id}/${next}" aria-label="Next card">▶</a>
+      ${prev || next ? `<div class="pager">
+        <a class="btn" data-go="prev" href="${prev}" aria-label="Previous card">◀ <span>Prev</span></a>
+        <span class="muted small swipe-hint">swipe to change cards</span>
+        <a class="btn" data-go="next" href="${next}" aria-label="Next card"><span>Next</span> ▶</a>
+      </div>` : ""}
     </div>
-    <p class="muted center keys">Keys: <kbd>space</kbd> record · <kbd>F</kbd> flip · <kbd>←</kbd> <kbd>→</kbd> cards</p>
+    <p class="muted center keys small">Keys: <kbd>space</kbd> record · <kbd>F</kbd> flip · <kbd>←</kbd> <kbd>→</kbd> cards</p>
   `);
+  slide = "";
   renderFront();
   renderBack();
+  bindSwipe(document.getElementById("scene"));
+  // Warm the voice for this card once the learner stops on it (not while paging quickly).
+  const mine = cs;
+  setTimeout(() => cs === mine && prefetch([mine.target, card.sentence].filter(Boolean)), 600);
+}
+
+function go(dir) {
+  const href = dir === "prev" ? cs?.prev : cs?.next;
+  if (!href) return;
+  slide = dir === "prev" ? "left" : "right";
+  location.hash = href;
+}
+
+function bindSwipe(el) {
+  let x0, y0, t0, ignore;
+  el.addEventListener("touchstart", (e) => {
+    const t = e.touches[0];
+    x0 = t.clientX; y0 = t.clientY; t0 = Date.now();
+    // Let rows that scroll sideways (word chips, tabs) keep their own swipe.
+    ignore = !!e.target.closest(".targets, .tabs, input, select");
+  }, { passive: true });
+  el.addEventListener("touchend", (e) => {
+    if (ignore || x0 == null) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - x0, dy = t.clientY - y0;
+    x0 = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy) && Date.now() - t0 < 800) go(dx < 0 ? "next" : "prev");
+  }, { passive: true });
 }
 
 function targetPicker() {
   const c = cs.card;
+  if (c.words.length < 2 && !c.sentence) return "";
   return `<div class="targets" role="group" aria-label="Choose what to practice">
     ${c.words.map((w) => `<button class="chip ${!cs.isSentence && w === cs.target ? "on" : ""}" data-target="${esc(w)}">${esc(w)}</button>`).join("")}
     ${c.sentence ? `<button class="chip sentence ${cs.isSentence ? "on" : ""}" data-target="__sentence">💬 sentence</button>` : ""}
   </div>`;
 }
 
+function catLabel(c) {
+  const p = c.p;
+  if (p) return [CAT_NAMES[c.cat], p.voicing].filter(Boolean).join(" · ");
+  if (c.g) return GRAPHEME_TYPES[c.g.type].name.replace(/s( \(|$)/, "$1").replace(/ \(.*\)$/, "");
+  return "Any word";
+}
+
 function renderFront() {
   const c = cs.card;
-  const p = c.p;
   const target = cs.isSentence ? c.sentence : cs.target;
-  const tags = p
-    ? [p.manner, p.voicing, p.group === "consonant" ? null : p.group]
-        .filter(Boolean).map((t) => `<span class="tag">${esc(t)}</span>`).join("")
-    : `<span class="tag">${esc(c.g.type.replace("-", " "))}</span>`;
   document.getElementById("front").innerHTML = `
-    <header class="face-head"><span>🎤 Your turn</span>${stars(store.stars(c.id))}</header>
-    <div class="glyph">${c.emoji ? `<span class="emoji">${c.emoji}</span>` : ""}<b>${esc(c.big)}</b>${ipa(c.ipa)}</div>
-    <div class="tags">${tags}</div>
-    <p class="say-this">Say: <strong class="${cs.isSentence ? "sentence-text" : "word-text"}">${esc(target)}</strong></p>
+    <header class="face-head"><span class="cat-pill">${esc(catLabel(c))}</span>${c.kind === "word" ? "" : stars(store.stars(c.id))}</header>
+    <div class="glyph">${c.emoji ? `<span class="emoji" aria-hidden="true">${c.emoji}</span>` : ""}<b>${esc(c.big)}</b>${ipa(c.ipa)}</div>
+    <p class="say-this"><span>Say</span> <strong class="${cs.isSentence ? "sentence-text" : "word-text"}">${esc(target)}</strong></p>
     ${targetPicker()}
     <div class="rec-row">
       <button class="rec" id="rec" aria-label="Record">${recorder.state === "recording" ? "⏹" : "🎤"}</button>
     </div>
-    <div class="status" id="status">${micSupported() ? "Tap the microphone and say it." : "This browser can’t record audio. You can still flip the card to listen."}</div>
+    <div class="status" id="status">${micSupported() ? "Tap the microphone and say it." : "This browser can’t record audio. You can still listen on the other side."}</div>
     <div id="result" aria-live="polite">${resultHtml()}</div>
-    <button class="btn flip-btn" data-flip>Flip to listen 👂</button>
   `;
 }
 
@@ -209,7 +387,7 @@ function resultHtml() {
   const mine = `<button class="btn" data-play-mine>▶ My try</button><button class="btn" data-compare>🔁 Mine vs. model</button>`;
   const r = cs.result;
   if (!r) return `<div class="actions">${mine}</div>`;
-  if (r.error) return `<div class="feedback warn"><p>${esc(r.error)}</p><p class="muted">Listen to your try and compare it with the model by ear.</p></div><div class="actions">${mine}</div>`;
+  if (r.error) return `<div class="feedback warn"><p>${esc(r.error)}</p><p class="muted small">Listen to your try and compare it with the model by ear.</p></div><div class="actions">${mine}</div>`;
   if (r.sentence) {
     const pct = Math.round(r.sentence.score * 100);
     return `<div class="feedback ${pct >= 90 ? "good" : "warn"}">
@@ -244,68 +422,90 @@ function resultHtml() {
   return `<div class="feedback ${isSuccess(s) ? "good" : "warn"}">${body}</div><div class="actions">${mine}</div>`;
 }
 
-function renderBack() {
-  const c = cs.card;
+/** Tabs for the back of the card: [id, label, html]. */
+function backTabs(c) {
   const lang = store.settings().language;
-  const back = document.getElementById("back");
-  let detail;
+  const tabs = [];
   if (c.kind === "sound") {
     const p = c.p;
     const myNote = lang && p.esl?.[lang];
     const otherNotes = Object.entries(p.esl ?? {}).filter(([l]) => l !== lang);
-    const positions = p.positions
-      ? Object.entries(p.positions).filter(([, ws]) => ws.length)
-          .map(([pos, ws]) => `<div class="pos"><small>${pos}</small>${ws.map((w) => say(w)).join("")}</div>`).join("")
-      : `<div class="pos">${p.words.map((w) => say(w)).join("")}</div>`;
-    detail = `
-      <section><h3>How to make it</h3><p>${esc(p.how)}</p><p class="tip">💡 ${esc(p.tip)}</p>
-        <p class="tags">${p.manner ? `<a class="tag" href="#/learn/${MANNERS[p.manner].lesson}">${esc(p.manner)}</a>` : ""}
+    tabs.push(["how", "How", `
+      ${myNote ? `<div class="callout"><h3>🌍 For ${esc(languageName(lang))} speakers</h3><p>${esc(myNote)}</p></div>` : ""}
+      <p>${esc(p.how)}</p><p class="tip">💡 ${esc(p.tip)}</p>
+      <p class="tags">${p.manner ? `<a class="tag" href="#/learn/${MANNERS[p.manner].lesson}">${esc(p.manner)}</a>` : ""}
         ${p.voicing ? `<a class="tag" href="#/learn/voicing">${esc(p.voicing)}</a>` : ""}
         ${p.place ? `<span class="tag">${esc(p.place)}</span>` : ""}
-        ${p.partner ? `<a class="tag" href="#/c/s-${p.partner}">partner: ${esc(phonemeById[p.partner].label)}</a>` : ""}</p>
-      </section>
-      ${myNote ? `<section class="callout"><h3>🌍 For ${esc(languageName(lang))} speakers</h3><p>${esc(myNote)}</p></section>` : ""}
-      <section><h3>Ways to spell it</h3><div class="spellings">${p.spellings.map(([g, w]) =>
-        `<button class="spelling" data-say="${esc(w.replace(/ \(.*\)$/, ""))}"><b>${esc(g)}</b><small>${esc(w)}</small></button>`).join("")}</div></section>
-      <section><h3>More words</h3>${positions}</section>
-      ${p.pairs?.length ? `<section><h3>Don’t mix it up (minimal pairs)</h3><div class="pairs">${p.pairs.map(pairBtns).join("")}</div></section>` : ""}
-      ${p.kids ? `<details><summary>🧒 For kids & parents</summary><p>${esc(p.kids)}</p></details>` : ""}
-      ${otherNotes.length ? `<details><summary>🌍 Tips for other first languages</summary><dl class="notes">${otherNotes.map(([l, n]) =>
-        `<dt>${esc(languageName(l))}</dt><dd>${esc(n)}</dd>`).join("")}</dl></details>` : ""}`;
-  } else {
+        ${p.partner ? `<a class="tag" href="#/c/s-${p.partner}">partner: ${esc(phonemeById[p.partner].label)}</a>` : ""}</p>`]);
+    tabs.push(["spell", "Spellings", `<div class="spellings">${p.spellings.map(([g, w]) =>
+      `<button class="spelling" data-say="${esc(w.replace(/ \(.*\)$/, ""))}"><b>${esc(g)}</b><small>${esc(w)}</small></button>`).join("")}</div>`]);
+    tabs.push(["words", "Words", p.positions
+      ? Object.entries(p.positions).filter(([, ws]) => ws.length)
+          .map(([pos, ws]) => `<div class="pos"><small>${pos}</small>${ws.map((w) => say(w)).join("")}</div>`).join("")
+      : `<div class="pos">${p.words.map((w) => say(w)).join("")}</div>`]);
+    if (p.pairs?.length) tabs.push(["pairs", "Pairs", `<p class="muted small">Don’t mix these up — tap both and listen for the difference.</p><div class="pairs">${p.pairs.map(pairBtns).join("")}</div>`]);
+    if (p.kids || otherNotes.length) tabs.push(["tips", "Tips", `
+      ${p.kids ? `<h3>🧒 For kids & parents</h3><p>${esc(p.kids)}</p>` : ""}
+      ${otherNotes.length ? `<h3>🌍 First-language tips</h3><dl class="notes">${otherNotes.map(([l, n]) =>
+        `<dt>${esc(languageName(l))}</dt><dd>${esc(n)}</dd>`).join("")}</dl>` : ""}`]);
+  } else if (c.kind === "spelling") {
     const g = c.g;
-    detail = `
-      <section><h3>What it says</h3><div class="sound-list">${g.sounds.length ? g.sounds.map(([id, w]) => {
-        const p = phonemeById[id];
-        return `<div class="sound-row">${say(w)} <a href="#/c/s-${id}">${esc(p.label)} ${ipa(p.ipa)}</a></div>`;
-      }).join("") : `<p>Nothing — it’s silent!</p>`}</div></section>
-      <section><p class="tip">💡 ${esc(g.note)}</p><p class="muted small">${esc(GRAPHEME_TYPES[g.type].blurb)}</p></section>
-      <section><h3>Words</h3><div class="pos">${g.words.map((w) => say(w)).join("")}</div></section>`;
+    tabs.push(["how", "Sounds", `<div class="sound-list">${g.sounds.length ? g.sounds.map(([id, w]) => {
+      const p = phonemeById[id];
+      return `<div class="sound-row">${say(w)} <a href="#/c/s-${id}">${esc(p.label)} ${ipa(p.ipa)}</a></div>`;
+    }).join("") : `<p>Nothing — it’s silent!</p>`}</div>
+      <p class="tip">💡 ${esc(g.note)}</p><p class="muted small">${esc(GRAPHEME_TYPES[g.type].blurb)}</p>`]);
+    tabs.push(["words", "Words", `<div class="pos">${g.words.map((w) => say(w)).join("")}</div>`]);
+  } else {
+    tabs.push(["how", "About", `
+      ${c.homes.length ? `<h3>Practice it on these cards</h3><div class="card-links">${c.homes.map(miniCard).join("")}</div>` : ""}
+      ${c.patterns.length ? `<h3>Spelling patterns in “${esc(c.big)}”</h3><div class="card-links">${c.patterns.map((g) => miniCard(cardById[g.id])).join("")}</div>
+        <p class="muted small">Guessed from the letters — English spelling has exceptions!</p>` : ""}
+      ${!c.homes.length && !c.patterns.length ? `<p class="muted">This word isn’t on any card yet, but you can still listen and practice it.</p>` : ""}`]);
+    if (c.pairs.length) tabs.push(["pairs", "Pairs", `<div class="pairs">${c.pairs.map(pairBtns).join("")}</div>`]);
   }
-  back.innerHTML = `
-    <header class="face-head"><span>👂 Listen</span><span class="big-label">${esc(c.big)} ${ipa(c.ipa)}</span></header>
+  return tabs;
+}
+
+function miniCard(c) {
+  return c ? `<a class="mini-card" data-cat="${c.cat}" href="#/c/${c.id}"><b>${esc(c.big)}</b>${ipa(c.ipa)}<small>${esc(c.words[0])}</small></a>` : "";
+}
+
+function renderBack() {
+  const c = cs.card;
+  const tabs = backTabs(c);
+  if (!tabs.some(([id]) => id === cs.tab)) cs.tab = tabs[0][0];
+  const target = cs.isSentence ? c.words[0] : cs.target;
+  document.getElementById("back").innerHTML = `
+    <header class="face-head"><span class="cat-pill">${esc(catLabel(c))}</span><span class="big-label">${esc(c.big)} ${ipa(c.ipa)}</span></header>
     <div class="listen">
-      <button class="btn primary" data-say="${esc(cs.target)}">🔊 ${esc(cs.target)}</button>
-      <button class="btn" data-say="${esc(cs.target)}" data-slow="1">🐢 Slowly</button>
-      ${c.sentence ? `<button class="btn" data-say="${esc(c.sentence)}">💬 In a sentence</button>` : ""}
+      <button class="btn primary big-say" data-say="${esc(target)}">🔊 ${esc(target)}</button>
+      <button class="btn" data-say="${esc(target)}" data-slow="1">🐢 Slowly</button>
+      ${c.sentence ? `<button class="btn" data-say="${esc(c.sentence)}">💬 Sentence</button>` : ""}
     </div>
     ${c.sentence ? `<p class="sentence-text center">“${esc(c.sentence)}”</p>` : ""}
-    ${detail}
-    <button class="btn flip-btn" data-flip>Flip to try 🎤</button>`;
+    <div class="tabs" role="tablist">${tabs.map(([id, label]) =>
+      `<button role="tab" aria-selected="${id === cs.tab}" data-tab="${id}">${esc(label)}</button>`).join("")}</div>
+    ${tabs.map(([id, , html]) => `<section class="tab-panel" role="tabpanel" data-panel="${id}" ${id === cs.tab ? "" : "hidden"}>${html}</section>`).join("")}`;
 }
 
 function flip(to = !cs.flipped) {
   cs.flipped = to;
   document.getElementById("flip").classList.toggle("flipped", to);
-  if (to) document.getElementById("back").scrollTop = 0;
+  document.getElementById("front").setAttribute("aria-hidden", String(to));
+  document.getElementById("back").setAttribute("aria-hidden", String(!to));
+  document.querySelectorAll("[data-side]").forEach((b) =>
+    b.setAttribute("aria-selected", String((b.dataset.side === "back") === to)));
 }
 
 async function toggleRecord() {
-  if (cs.busy || !micSupported()) return;
+  if (!cs || cs.busy || !micSupported()) return;
   const btn = document.getElementById("rec");
   const status = document.getElementById("status");
+  if (!btn) return;
   if (recorder.state === "recording") return finishRecording();
   if (recorder.state !== "idle") return;
+  if (cs.flipped) flip(false);
   stopAudio();
   try {
     await recorder.start({
@@ -323,17 +523,17 @@ async function toggleRecord() {
 
 async function finishRecording() {
   if (recorder.state !== "recording") return;
+  const mine = cs;
   const myCard = cs.card;
   const target = cs.isSentence ? cs.card.sentence : cs.target;
-  cs.busy = true;
-  const status = document.getElementById("status");
-  status.textContent = "Checking…";
+  mine.busy = true;
+  document.getElementById("status").textContent = "Checking…";
   const btn = document.getElementById("rec");
   btn.classList.remove("recording");
   btn.textContent = "⏳";
   try {
     const take = await recorder.stop();
-    if (cs.card !== myCard) return;
+    if (cs !== mine) return;
     cs.take = take;
     cs.result = null;
     if (!take.speech) {
@@ -342,7 +542,7 @@ async function finishRecording() {
       cs.result = { error: "The speech checker isn’t connected right now." };
     } else {
       const { text, scores } = await transcribe(take.wav, cs.isSentence ? [] : candidatesFor(target, myCard.pairs));
-      if (cs.card !== myCard) return;
+      if (cs !== mine) return;
       if (cs.isSentence) {
         const sentence = scoreSentence(target, text);
         cs.result = { text, sentence };
@@ -354,45 +554,113 @@ async function finishRecording() {
       }
     }
   } catch (e) {
-    cs.result = { error: e.message };
+    if (cs === mine) cs.result = { error: e.message };
   } finally {
-    cs.busy = false;
+    mine.busy = false;
   }
-  if (cs.card === myCard) {
-    renderFront();
-    document.getElementById("status").textContent = "Tap the microphone to try again.";
-  }
+  if (cs !== mine) return;
+  renderFront();
+  document.getElementById("status").textContent = "Tap the microphone to try again.";
+  const won = (cs.result?.score && isSuccess(cs.result.score)) || cs.result?.sentence?.score >= 0.9;
+  if (won) celebrate(document.getElementById("rec"));
 }
 
 $app.addEventListener("click", async (e) => {
   if (!cs || !document.getElementById("flip")) return;
-  const t = e.target.closest("button");
+  const t = e.target.closest("button, a[data-go]");
   if (!t) return;
+  if (t.dataset.go) { e.preventDefault(); return go(t.dataset.go); }
   if (t.id === "rec") return toggleRecord();
-  if (t.hasAttribute("data-flip")) return flip();
+  if (t.dataset.side) return flip(t.dataset.side === "back");
+  if (t.dataset.tab) {
+    cs.tab = t.dataset.tab;
+    document.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-selected", String(b === t)));
+    document.querySelectorAll("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== cs.tab));
+    return;
+  }
   if (t.dataset.target) {
     cs.isSentence = t.dataset.target === "__sentence";
     if (!cs.isSentence) cs.target = t.dataset.target;
     cs.take = cs.result = null;
     renderFront();
     renderBack();
+    prefetch([cs.isSentence ? cs.card.sentence : cs.target]);
     return;
   }
-  if (t.hasAttribute("data-play-mine") && cs.take) return playUrl(cs.take.url);
+  if (t.hasAttribute("data-play-mine") && cs.take) return playUrl(cs.take.url).catch((err) => toast(`🔇 ${err.message}`));
   if (t.hasAttribute("data-compare") && cs.take) {
-    await playUrl(cs.take.url);
-    await new Promise((r) => setTimeout(r, 400));
-    return speak(cs.isSentence ? cs.card.sentence : cs.target);
+    try {
+      await playUrl(cs.take.url);
+      await new Promise((r) => setTimeout(r, 400));
+      await speak(cs.isSentence ? cs.card.sentence : cs.target);
+    } catch (err) { toast(`🔇 ${err.message}`); }
   }
 });
 
 document.addEventListener("keydown", (e) => {
-  if (!document.getElementById("flip") || e.target.closest("input, select, textarea")) return;
+  if (!document.getElementById("flip") || e.target.closest("input, select, textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.code === "Space") { e.preventDefault(); toggleRecord(); }
   else if (e.key === "f" || e.key === "F") flip();
-  else if (e.key === "ArrowRight") document.querySelector('.card-nav a:last-child')?.click();
-  else if (e.key === "ArrowLeft") document.querySelector('.card-nav a:first-child')?.click();
+  else if (e.key === "ArrowRight") go("next");
+  else if (e.key === "ArrowLeft") go("prev");
 });
+
+// ───────────────────────── search ─────────────────────────
+function viewSearch() {
+  const q = query.get("q") ?? "";
+  render(`
+    <nav class="crumbs"><a href="#/">Home</a> › Search</nav>
+    <h1>🔎 Search</h1>
+    <form class="search-box big" id="search-form" role="search">
+      <span aria-hidden="true">🔎</span>
+      <input id="q" name="q" type="search" value="${esc(q)}" placeholder="A word (“thumb”), a spelling (“igh”), a sound (“schwa”, “θ”)…" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Search">
+    </form>
+    <div id="results" aria-live="polite"></div>`);
+  const input = document.getElementById("q");
+  let timer;
+  const run = () => {
+    const v = input.value;
+    history.replaceState(null, "", `#/search${v.trim() ? `?q=${encodeURIComponent(v.trim())}` : ""}`);
+    document.getElementById("results").innerHTML = searchResults(v);
+  };
+  input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 120); });
+  document.getElementById("search-form").addEventListener("submit", (e) => { e.preventDefault(); run(); input.blur(); });
+  run();
+  if (!q) input.focus();
+}
+
+function searchResults(q) {
+  const term = q.trim();
+  if (!term) {
+    return `<div class="empty"><p>Try: ${["thumb", "night", "sh", "igh", "schwa", "voiced", "homophone"].map((s) =>
+      `<a class="chip" href="#/search?q=${encodeURIComponent(s)}">${s}</a>`).join(" ")}</p></div>`;
+  }
+  const r = search(term);
+  const oneWord = /^[a-z'’-]+$/i.test(term);
+  const parts = [];
+  if (r.words.length) {
+    parts.push(`<h2>Words</h2><div class="word-results">${r.words.map(({ word, cards }) => `
+      <div class="word-row">${say(word)}
+        <span class="on-cards">${cards.map((c) => `<a class="chip" data-cat="${c.cat}" href="#/c/${c.id}?w=${encodeURIComponent(word)}">${esc(c.big)}${c.ipa && store.settings().showIpa ? ` <span class="ipa">/${esc(c.ipa)}/</span>` : ""}</a>`).join("")}</span>
+      </div>`).join("")}</div>`);
+  }
+  if (oneWord && normalize(term) && !r.words.some((x) => normalize(x.word) === normalize(term))) {
+    parts.push(`<a class="practice-any" href="#/word/${encodeURIComponent(term)}">🎤 Practice “${esc(term)}” on its own card →</a>`);
+  } else if (oneWord && r.words.length) {
+    parts.push(`<p><a href="#/word/${encodeURIComponent(term)}">Or practice “${esc(term)}” on its own →</a></p>`);
+  }
+  if (r.cards.length) parts.push(`<h2>Sounds & spellings</h2><div class="card-grid">${r.cards.map(miniCard).join("")}</div>`);
+  if (r.lessons.length) {
+    const hi = (s) => esc(s).replace(new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), (m) => `<mark>${m}</mark>`);
+    parts.push(`<h2>Lessons</h2><div class="lesson-list">${r.lessons.map(({ l, snippet }) =>
+      `<a class="lesson" href="#/learn/${l.id}"><span class="emoji" aria-hidden="true">${l.emoji}</span><div><b>${esc(l.title)}</b><p>…${hi(snippet)}…</p></div></a>`).join("")}</div>`);
+  }
+  if (r.homophones.length) {
+    parts.push(`<h2>Homophones</h2><div class="homophone-list">${r.homophones.map((g) =>
+      `<div class="hgroup">${say(g[0][0], "hear")}${g.map(([w, m]) => `<span><b>${esc(w)}</b> <small>${esc(m)}</small></span>`).join("")}</div>`).join("")}</div>`);
+  }
+  return parts.join("") || `<div class="empty"><p>Nothing found for “${esc(term)}”.</p></div>`;
+}
 
 // ───────────────────────── learn ─────────────────────────
 function viewLearn() {
@@ -400,7 +668,7 @@ function viewLearn() {
     <nav class="crumbs"><a href="#/">Home</a> › Learn</nav>
     <h1>📚 Learn how sounds work</h1>
     <div class="lesson-list">
-      ${LESSONS.map((l) => `<a class="lesson" href="#/learn/${l.id}"><span class="emoji">${l.emoji}</span><div><b>${esc(l.title)}</b><p>${esc(l.summary)}</p></div></a>`).join("")}
+      ${LESSONS.map((l) => `<a class="lesson" href="#/learn/${l.id}"><span class="emoji" aria-hidden="true">${l.emoji}</span><div><b>${esc(l.title)}</b><p>${esc(l.summary)}</p></div></a>`).join("")}
     </div>`);
 }
 
@@ -412,7 +680,7 @@ function viewLesson(id) {
   render(`
     <nav class="crumbs"><a href="#/">Home</a> › <a href="#/learn">Learn</a> › ${esc(l.title)}</nav>
     <article class="lesson-body">
-      <h1>${l.emoji} ${esc(l.title)}</h1>
+      <h1><span aria-hidden="true">${l.emoji}</span> ${esc(l.title)}</h1>
       <p class="lead">${esc(l.summary)}</p>
       ${l.sections.map((s) => `
         <section>
@@ -420,10 +688,7 @@ function viewLesson(id) {
           ${s.html ?? ""}
           ${s.words ? `<div class="pos">${s.words.map((w) => say(w)).join("")}</div>` : ""}
           ${s.pairs ? `<div class="pairs">${s.pairs.map(pairBtns).join("")}</div>` : ""}
-          ${s.cards ? `<div class="card-links">${s.cards.map((c) => {
-            const card = cardById[`s-${c}`] ?? cardById[c];
-            return card ? `<a class="mini-card" href="#/c/${card.id}"><b>${esc(card.big)}</b>${ipa(card.ipa)}<small>${esc(card.words[0])}</small></a>` : "";
-          }).join("")}</div>` : ""}
+          ${s.cards ? `<div class="card-links">${s.cards.map((c) => miniCard(cardById[`s-${c}`] ?? cardById[c])).join("")}</div>` : ""}
         </section>`).join("")}
       ${next ? `<a class="btn primary" href="#/learn/${next.id}">Next: ${esc(next.title)} →</a>` : ""}
     </article>`);
@@ -457,15 +722,15 @@ function viewPairs() {
   const st = store.pairStats();
   render(`
     <nav class="crumbs"><a href="#/">Home</a> › Minimal pairs</nav>
-    <h1>👂 Minimal pairs</h1>
-    <p class="muted">Two words, one sound different. <b>Listen</b> mode trains your ear; <b>Say</b> mode checks whether the speech checker hears the word you meant.</p>
+    <h1>⇄ Minimal pairs</h1>
+    <p class="muted">Two words, one sound different. <b>Listen</b> trains your ear; <b>Say</b> checks whether the speech checker hears the word you meant.</p>
     <div class="controls">
       <div class="seg" role="group">
         <button class="${ps.mode === "listen" ? "on" : ""}" data-mode="listen">👂 Listen</button>
         <button class="${ps.mode === "say" ? "on" : ""}" data-mode="say">🎤 Say</button>
       </div>
       <select id="pair-filter" aria-label="Sound">${opts.map(([v, n]) => `<option value="${v}" ${v === ps.filter ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>
-      <span class="muted small">Score: ${st.wins} / ${st.tries}</span>
+      <span class="muted small" id="pair-score">Score: ${st.wins} / ${st.tries}</span>
     </div>
     <div class="game" id="game"></div>`);
   document.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = () => { ps.mode = b.dataset.mode; viewPairs(); }));
@@ -480,6 +745,12 @@ function pairPool() {
   return ALL_PAIRS.filter((p) => p.sound === ps.filter);
 }
 
+function updatePairScore() {
+  const st = store.pairStats();
+  const el = document.getElementById("pair-score");
+  if (el) el.textContent = `Score: ${st.wins} / ${st.tries}`;
+}
+
 function nextPair() {
   const pool = pairPool();
   const game = document.getElementById("game");
@@ -489,6 +760,7 @@ function nextPair() {
   const other = target === pair.a ? pair.b : pair.a;
   const p = phonemeById[pair.sound];
   ps.round = { pair, target, other, answered: false };
+  prefetch([pair.a, pair.b]);
   if (ps.mode === "listen") {
     game.innerHTML = `
       <p class="prompt">Which word do you hear?</p>
@@ -496,13 +768,14 @@ function nextPair() {
       <button class="btn" data-say="${esc(target)}" data-slow="1">🐢 Slow</button>
       <div class="choices">${shuffle([pair.a, pair.b]).map((w) => `<button class="choice" data-choice="${esc(w)}">${esc(w)}</button>`).join("")}</div>
       <div id="pair-fb" aria-live="polite"></div>`;
-    setTimeout(() => speak(target).catch(() => {}), 250);
     game.querySelectorAll("[data-choice]").forEach((b) => (b.onclick = () => {
       if (ps.round.answered) return;
       ps.round.answered = true;
       const ok = b.dataset.choice === target;
       store.recordPair(ok);
+      updatePairScore();
       b.classList.add(ok ? "right" : "wrong");
+      if (ok) celebrate(b);
       if (!ok) game.querySelector(`[data-choice="${CSS.escape(target)}"]`)?.classList.add("right");
       document.getElementById("pair-fb").innerHTML = `
         <div class="feedback ${ok ? "good" : "warn"}">
@@ -528,23 +801,27 @@ function nextPair() {
       try {
         const take = await recorder.stop();
         let html;
+        let ok = false;
         if (!take.speech) html = `<div class="feedback warn"><p>🙉 I didn’t hear anything. Try again.</p></div>`;
         else if (!(await health()).stt) html = `<div class="feedback warn"><p>The speech checker is offline.</p></div><button class="btn" id="mine">▶ My try</button>`;
         else {
           const pairs = [[pair.a, pair.b]];
           const { text, scores } = await transcribe(take.wav, candidatesFor(target, pairs));
           const s = refineWithScores(scoreWord(target, text, { pairs }), target, scores, pairs);
-          const ok = isSuccess(s);
-          if (s.result !== "nothing") store.recordPair(ok);
+          ok = isSuccess(s);
+          if (s.result !== "nothing") { store.recordPair(ok); updatePairScore(); }
           html = `<div class="feedback ${ok ? "good" : "warn"}"><p><b>${
             ok ? `✅ That sounded like “${esc(target)}”.` : s.result === "swap" ? `🤔 That sounded like “${esc(other)}”.` : s.result === "nothing" ? "🙉 I didn’t catch that." : `🤔 I heard “${esc(s.word ?? s.heard)}”.`
           }</b></p>${!ok ? `<p class="tip">💡 ${esc(p.how)}</p>` : ""}</div>
           <button class="btn" id="mine">▶ My try</button>`;
         }
+        if (!fb.isConnected) return;
         fb.innerHTML = html + `<button class="btn primary" id="next-pair">Next →</button>`;
-        document.getElementById("mine")?.addEventListener("click", () => playUrl(take.url));
+        document.getElementById("mine")?.addEventListener("click", () => playUrl(take.url).catch((e) => toast(`🔇 ${e.message}`)));
         document.getElementById("next-pair").onclick = nextPair;
+        if (ok) celebrate(btn);
       } catch (e) {
+        if (!fb.isConnected) return;
         fb.innerHTML = `<div class="feedback warn"><p>${esc(e.message)}</p></div><button class="btn primary" id="next-pair">Next →</button>`;
         document.getElementById("next-pair").onclick = nextPair;
       }
@@ -553,6 +830,7 @@ function nextPair() {
     btn.onclick = async () => {
       if (recorder.state === "recording") return finish();
       if (recorder.state !== "idle") return;
+      stopAudio();
       try {
         await recorder.start({ maxMs: 5000, onLevel: (l) => btn.style.setProperty("--level", l.toFixed(2)), onAutoStop: finish });
         btn.classList.add("recording");
@@ -573,13 +851,13 @@ function viewHomophones() {
     <div class="game" id="hquiz"></div>
     <h2>All homophones</h2>
     <div class="homophone-list">
-      ${HOMOPHONES.map((g) => `<div class="hgroup">${say(g[0][0], "🔊")}${g.map(([w, m]) => `<span><b>${esc(w)}</b> <small>${esc(m)}</small></span>`).join("")}</div>`).join("")}
+      ${HOMOPHONES.map((g) => `<div class="hgroup">${say(g[0][0], "hear")}${g.map(([w, m]) => `<span><b>${esc(w)}</b> <small>${esc(m)}</small></span>`).join("")}</div>`).join("")}
     </div>
     <h2>Heteronyms: same spelling, different sound</h2>
     <div class="homophone-list">
       ${HETERONYMS.map((h) => `<div class="hgroup"><b class="het">${esc(h.word)}</b>
-        <span>${say(h.a[1], "🔊")} <small>${esc(h.a[0])} — “${esc(h.a[1])}”</small></span>
-        <span>${say(h.b[1], "🔊")} <small>${esc(h.b[0])} — “${esc(h.b[1])}”</small></span></div>`).join("")}
+        <span>${say(h.a[1], "hear")} <small>${esc(h.a[0])} — “${esc(h.a[1])}”</small></span>
+        <span>${say(h.b[1], "hear")} <small>${esc(h.b[0])} — “${esc(h.b[1])}”</small></span></div>`).join("")}
     </div>`);
   homophoneQuiz();
 }
@@ -589,12 +867,13 @@ function homophoneQuiz() {
   const [word, meaning] = pick(group);
   const el = document.getElementById("hquiz");
   el.innerHTML = `
-    <p class="prompt">Quiz: which spelling means <b>“${esc(meaning)}”</b>? ${say(word, "hear it")}</p>
+    <p class="prompt">Which spelling means <b>“${esc(meaning)}”</b>? ${say(word, "hear it")}</p>
     <div class="choices">${shuffle(group).map(([w]) => `<button class="choice" data-h="${esc(w)}">${esc(w)}</button>`).join("")}</div>
     <div id="h-fb"></div>`;
   el.querySelectorAll("[data-h]").forEach((b) => (b.onclick = () => {
     const ok = b.dataset.h === word;
     b.classList.add(ok ? "right" : "wrong");
+    if (ok) celebrate(b);
     document.getElementById("h-fb").innerHTML = `<p>${ok ? "✅ Yes!" : `❌ It’s “${esc(word)}”.`}</p><button class="btn primary" id="h-next">Next →</button>`;
     document.getElementById("h-next").onclick = homophoneQuiz;
   }));
@@ -602,7 +881,7 @@ function homophoneQuiz() {
 
 // ───────────────────────── spelling chart ─────────────────────────
 function viewChart() {
-  const row = (p) => `<tr>
+  const row = (p) => `<tr data-cat="${cardById[`s-${p.id}`].cat}">
     <td><a href="#/c/s-${p.id}"><b>${esc(p.label)}</b> ${ipa(p.ipa)}</a></td>
     <td>${say(p.key)}</td>
     <td class="spellings">${p.spellings.map(([g, w]) => `<button class="spelling" data-say="${esc(w.replace(/ \(.*\)$/, ""))}"><b>${esc(g)}</b><small>${esc(w)}</small></button>`).join("")}</td>
@@ -631,20 +910,20 @@ function viewProgress() {
     .map((c) => {
       const p = prog[c.id];
       const words = Object.entries(p.words).map(([w, [t, k]]) => `<span class="${k ? "ok" : "missed"}">${esc(w)} ${k}/${t}</span>`).join(" ");
-      return `<tr><td><a href="#/c/${c.id}"><b>${esc(c.big)}</b> ${ipa(c.ipa)}</a></td><td>${stars(store.stars(c.id))}</td><td>${p.wins}/${p.tries}</td><td class="small">${words}</td></tr>`;
+      return `<tr data-cat="${c.cat}"><td><a href="#/c/${c.id}"><b>${esc(c.big)}</b> ${ipa(c.ipa)}</a></td><td>${stars(store.stars(c.id))}</td><td>${p.wins}/${p.tries}</td><td class="small">${words}</td></tr>`;
     }).join("");
   render(`
     <nav class="crumbs"><a href="#/">Home</a> › Progress</nav>
     <h1>⭐ ${esc(store.currentLearner())}’s progress</h1>
     <div class="stats">
-      <div><b>${tried.length}</b><small>cards practiced</small></div>
-      <div><b>${total ? Math.round((wins / total) * 100) : 0}%</b><small>tries matched</small></div>
-      <div><b>${ALL_CARDS.filter((c) => store.stars(c.id) === 3).length}</b><small>3-star cards</small></div>
-      <div><b>${pairs.tries ? Math.round((pairs.wins / pairs.tries) * 100) : 0}%</b><small>minimal pairs (${pairs.tries})</small></div>
+      <div data-cat="plosive"><b>${tried.length}</b><small>cards practiced</small></div>
+      <div data-cat="vowel"><b>${total ? Math.round((wins / total) * 100) : 0}%</b><small>tries matched</small></div>
+      <div data-cat="fricative"><b>${ALL_CARDS.filter((c) => store.stars(c.id) === 3).length}</b><small>3-star cards</small></div>
+      <div data-cat="liquid"><b>${pairs.tries ? Math.round((pairs.wins / pairs.tries) * 100) : 0}%</b><small>minimal pairs (${pairs.tries})</small></div>
     </div>
     ${rows ? `<div class="table-wrap"><table class="chart"><thead><tr><th>Card</th><th>Stars</th><th>Matched</th><th>Words</th></tr></thead><tbody>${rows}</tbody></table></div>`
-      : `<p class="muted">No practice yet. <a href="#/deck/consonants">Start with the consonants!</a></p>`}
-    <p class="muted small">Stars: ★ = 1 word said right, ★★ = 3 words, ★★★ = 5 words. Progress is saved in this browser only.</p>`);
+      : `<div class="empty"><p>No practice yet.</p><a class="btn primary" href="#/deck/consonants">Start with the consonants</a></div>`}
+    <p class="muted small">Stars: ★ = 1 word said right, ★★ = 3 words, ★★★ = 5 words. Progress is saved on this device.</p>`);
 }
 
 // ───────────────────────── settings ─────────────────────────
@@ -655,6 +934,16 @@ async function viewSettings() {
     <nav class="crumbs"><a href="#/">Home</a> › Settings</nav>
     <h1>⚙️ Settings</h1>
     <form class="settings" onsubmit="return false">
+      <fieldset><legend>Look</legend>
+        <div class="look-picker" role="radiogroup">
+          ${Object.entries(LOOKS).map(([id, l]) => `
+            <label class="look-option" data-preview="${id}">
+              <input type="radio" name="look" value="${id}" ${s.look === id ? "checked" : ""}>
+              <span class="look-swatch" aria-hidden="true"><i></i><i></i><i></i><b>Aa</b></span>
+              <span><b>${esc(l.name)}</b><small>${esc(l.blurb)}</small></span>
+            </label>`).join("")}
+        </div>
+      </fieldset>
       <fieldset><legend>Learner</legend>
         <label>Who’s practicing?
           <select id="learner">${store.learners().map((l) => `<option ${l === store.currentLearner() ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>
@@ -665,14 +954,14 @@ async function viewSettings() {
           <select id="language"><option value="">English / not set</option>${LANGUAGES.map((l) => `<option value="${l.id}" ${l.id === s.language ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select>
         </label>
         <label class="check"><input type="checkbox" id="showIpa" ${s.showIpa ? "checked" : ""}> Show IPA symbols (like /θ/)</label>
-        <label class="check"><input type="checkbox" id="kidMode" ${s.kidMode ? "checked" : ""}> Kid mode (bigger buttons, simpler screens)</label>
+        <label class="check"><input type="checkbox" id="kidMode" ${s.kidMode ? "checked" : ""}> Kid mode (bigger buttons)</label>
       </fieldset>
       <fieldset><legend>Voice</legend>
         <label>Voice source
           <select id="ttsSource">
             <option value="auto" ${s.ttsSource === "auto" ? "selected" : ""}>Automatic (server voice if available)</option>
-            <option value="server" ${s.ttsSource === "server" ? "selected" : ""}>Server voice (Deepgram Aura)</option>
-            <option value="browser" ${s.ttsSource === "browser" ? "selected" : ""}>This device’s built-in voice</option>
+            <option value="server" ${s.ttsSource === "server" ? "selected" : ""}>Server voice</option>
+            <option value="browser" ${s.ttsSource === "browser" ? "selected" : ""}>This device’s built-in voice (works offline)</option>
           </select></label>
         <label>Server voice
           <select id="serverVoice">${["asteria", "luna", "stella", "athena", "hera", "orion", "arcas", "perseus", "angus", "orpheus", "helios", "zeus"]
@@ -693,13 +982,14 @@ async function viewSettings() {
       </fieldset>
     </form>`);
   const on = (id, ev, fn) => document.getElementById(id).addEventListener(ev, fn);
+  document.querySelectorAll('input[name="look"]').forEach((r) => r.addEventListener("change", () => { lookOverride = null; store.setSetting("look", r.value); applyLook(); }));
   on("learner", "change", (e) => { store.setLearner(e.target.value); viewSettings(); });
   on("add-learner", "click", () => { store.setLearner(document.getElementById("new-learner").value); viewSettings(); });
   on("del-learner", "click", () => {
     if (confirm(`Remove ${store.currentLearner()} and their progress?`)) { store.removeLearner(store.currentLearner()); viewSettings(); }
   });
   for (const id of ["language", "ttsSource", "serverVoice", "voice"]) on(id, "change", (e) => store.setSetting(id, e.target.value));
-  for (const id of ["showIpa", "kidMode"]) on(id, "change", (e) => { store.setSetting(id, e.target.checked); applyMode(); });
+  for (const id of ["showIpa", "kidMode"]) on(id, "change", (e) => { store.setSetting(id, e.target.checked); applyLook(); });
   on("rate", "input", (e) => { store.setSetting("rate", +e.target.value); document.getElementById("rate-out").textContent = e.target.value; });
   on("passcode", "change", async (e) => { store.setSetting("passcode", e.target.value.trim()); await showHealth(true); });
   on("export", "click", () => {
@@ -724,10 +1014,14 @@ async function showHealth(force) {
     : `⚠️ Not connected. ${esc(h.error ?? "")}`;
 }
 
-function applyMode() {
-  document.body.classList.toggle("kid", !!store.settings().kidMode);
-}
-
-applyMode();
+// ?look=studio in the page URL tries a look without changing the saved setting (handy for previews).
+const urlLook = new URLSearchParams(location.search).get("look");
+if (urlLook && LOOKS[urlLook]) lookOverride = urlLook;
+applyLook();
 window.addEventListener("hashchange", route);
 route();
+health(); // warm up: the first tap on 🔊 shouldn't wait for this
+
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+  navigator.serviceWorker.register("sw.js").catch((e) => console.warn("Offline support unavailable", e));
+}
