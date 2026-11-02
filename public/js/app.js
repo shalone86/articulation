@@ -13,6 +13,7 @@ import { health, transcribe } from "./api.js";
 import { search, cardsForWord, patternsIn } from "./search.js";
 import { CHECKUP_SENTENCES, analyzeCheckup } from "./checkup.js";
 import * as store from "./store.js";
+import { sfx, installClickSounds } from "./sound.js";
 
 const $app = document.getElementById("app");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -137,6 +138,7 @@ function toast(msg) {
 
 function celebrate(anchor) {
   if (!anchor) return;
+  sfx.win();
   anchor.classList.remove("win");
   void anchor.offsetWidth; // restart the glow animation
   anchor.classList.add("win");
@@ -857,6 +859,7 @@ function nextPair() {
       const ok = b.dataset.choice === target;
       store.recordPair(ok);
       b.classList.add(ok ? "right" : "wrong");
+      if (!ok) sfx.oops();
       if (ok) celebrate(b);
       if (!ok) game.querySelector(`[data-choice="${CSS.escape(target)}"]`)?.classList.add("right");
       document.getElementById("pair-fb").innerHTML = `
@@ -960,6 +963,7 @@ function homophoneQuiz() {
   el.querySelectorAll("[data-h]").forEach((b) => (b.onclick = () => {
     const ok = b.dataset.h === word;
     b.classList.add(ok ? "right" : "wrong");
+    if (!ok) sfx.oops();
     if (ok) celebrate(b);
     else el.querySelector(`[data-h="${CSS.escape(word)}"]`)?.classList.add("right");
     document.getElementById("h-fb").innerHTML = `<p>${ok ? "✅ Yes!" : `❌ It’s “${esc(word)}”.`}</p><button class="btn primary" id="h-next">Next →</button>`;
@@ -1049,6 +1053,7 @@ async function viewSettings() {
         <div id="l1-preview">${s.language ? l1Html(s.language, store.checkup()) : ""}</div>
         <label class="check"><input type="checkbox" id="showIpa" ${s.showIpa ? "checked" : ""}> Show IPA symbols (like /θ/)</label>
         <label class="check"><input type="checkbox" id="kidMode" ${s.kidMode ? "checked" : ""}> Kid mode (bigger buttons)</label>
+        <label class="check"><input type="checkbox" id="sounds" ${s.sounds ? "checked" : ""}> Sound effects on buttons and answers</label>
         <label class="check"><input type="checkbox" id="autoSay" ${s.autoSay ? "checked" : ""}> Play the word right away in Pairs and Homophones</label>
       </fieldset>
       <fieldset><legend>Voice</legend>
@@ -1087,7 +1092,7 @@ async function viewSettings() {
   on("language", "change", (e) => {
     document.getElementById("l1-preview").innerHTML = e.target.value ? l1Html(e.target.value, store.checkup()) : "";
   });
-  for (const id of ["showIpa", "kidMode", "autoSay"]) on(id, "change", (e) => { store.setSetting(id, e.target.checked); applyLook(); });
+  for (const id of ["showIpa", "kidMode", "autoSay", "sounds"]) on(id, "change", (e) => { store.setSetting(id, e.target.checked); applyLook(); });
   on("rate", "input", (e) => { store.setSetting("rate", +e.target.value); document.getElementById("rate-out").textContent = e.target.value; });
   on("passcode", "change", async (e) => { store.setSetting("passcode", e.target.value.trim()); await showHealth(true); });
   on("export", "click", () => {
@@ -1358,6 +1363,7 @@ if (urlLook && LOOKS[urlLook]) lookOverride = urlLook;
 applyLook();
 updateInstallLink();
 window.addEventListener("hashchange", route);
+installClickSounds();
 route();
 health(); // warm up: the first tap on 🔊 shouldn't wait for this
 

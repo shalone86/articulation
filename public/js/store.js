@@ -15,6 +15,7 @@ const DEFAULTS = {
     rate: 0.9,
     passcode: "",
     kidMode: false,
+    sounds: true, // button and answer sound effects
     look: "playroom", // playroom | studio | pop
   },
   last: null, // { deck, card } — "continue where you left off"
