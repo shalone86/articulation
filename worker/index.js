@@ -22,6 +22,7 @@ const TTS_VOICE_LIST = ["helena", "thalia", "asteria", "luna", "athena", "aurora
   "theia", "vesta", "apollo", "arcas", "aries", "atlas", "draco", "hermes", "hyperion", "janus", "jupiter", "mars",
   "neptune", "odysseus", "orion", "orpheus", "pluto", "saturn", "zeus"];
 const TTS_VOICES = new Set(TTS_VOICE_LIST);
+const ORIGIN_TIMEOUT_MS_TTS = 8000; // a sleeping Mac shouldn't keep a child waiting
 const MAX_AUDIO_BYTES = 2 * 1024 * 1024; // ~60 s of 16 kHz mono WAV
 const ORIGIN_TIMEOUT_MS = 12000; // a sleeping Hugging Face Space takes longer than this to wake
 
@@ -124,7 +125,25 @@ async function tts(request, url, env, ctx) {
   if (!text) return json({ error: "missing text" }, 400);
   const voice = TTS_VOICES.has(url.searchParams.get("voice")) ? url.searchParams.get("voice") : "helena";
 
-  // Same text + voice → same audio, so cache it at the edge.
+
+  // 1. Your own voice server, if TTS_ORIGIN is set (free, unlimited). Falls back to Workers AI.
+  if (env.TTS_ORIGIN) {
+    const own = ownVoice(voice, env);
+    const ownKey = new Request(`https://tts.cache/own/${encodeURIComponent(own)}/${encodeURIComponent(text)}`);
+    const ownHit = await caches.default.match(ownKey);
+    if (ownHit) return ownHit;
+    try {
+      const res = new Response(await fromOrigin(text, own, env), {
+        headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=2592000", "x-voice-source": "own" },
+      });
+      ctx.waitUntil(caches.default.put(ownKey, res.clone()));
+      return res;
+    } catch (e) {
+      console.warn("voice server unavailable, using Workers AI:", String(e?.message ?? e));
+    }
+  }
+
+  // 2. Workers AI. Same text + voice → same audio, so cache it at the edge.
   const cacheKey = new Request(`https://tts.cache/aura-2/${voice}/${encodeURIComponent(text)}`);
   const cache = caches.default;
   const hit = await cache.match(cacheKey);
@@ -133,10 +152,34 @@ async function tts(request, url, env, ctx) {
   const raw = await env.AI.run(TTS_MODEL, { text, speaker: voice, encoding: "mp3" }, { returnRawResponse: true });
   if (!raw.ok) return json({ error: `tts failed (${raw.status})` }, 502);
   const res = new Response(raw.body, {
-    headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=2592000" },
+    headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=2592000", "x-voice-source": "aura" },
   });
   ctx.waitUntil(cache.put(cacheKey, res.clone()));
   return res;
+}
+
+// The Aura voice names say who is speaking; on the Mac a woman is af_heart (TTS_VOICE) and a man am_michael.
+const MALE_AURA = new Set(["apollo", "arcas", "aries", "atlas", "draco", "hermes", "hyperion", "janus", "jupiter", "mars",
+  "neptune", "odysseus", "orion", "orpheus", "pluto", "saturn", "zeus"]);
+function ownVoice(voice, env) {
+  return MALE_AURA.has(voice) ? "am_michael" : env.TTS_VOICE || "af_heart";
+}
+
+// Your own voice server (e.g. Kokoro on a Mac) speaking the OpenAI-style API. Throws if it's down.
+async function fromOrigin(text, voice, env) {
+  const headers = { "content-type": "application/json" };
+  if (env.TTS_TOKEN) headers.authorization = `Bearer ${env.TTS_TOKEN}`;
+  const r = await fetch(`${env.TTS_ORIGIN.replace(/\/+$/, "")}/v1/audio/speech`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ model: env.TTS_MODEL || "kokoro", input: text, voice, response_format: "mp3", speed: 1 }),
+    signal: AbortSignal.timeout(ORIGIN_TIMEOUT_MS_TTS),
+  });
+  const type = r.headers.get("content-type") ?? "";
+  if (!r.ok || !/audio|octet-stream/.test(type)) throw new Error(`voice server answered ${r.status} ${type}`);
+  const buf = await r.arrayBuffer();
+  if (buf.byteLength < 500) throw new Error("voice server sent an empty clip");
+  return buf;
 }
 
 function toBase64(buf) {
