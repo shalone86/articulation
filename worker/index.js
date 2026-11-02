@@ -22,7 +22,7 @@ const TTS_VOICE_LIST = ["helena", "thalia", "asteria", "luna", "athena", "aurora
   "theia", "vesta", "apollo", "arcas", "aries", "atlas", "draco", "hermes", "hyperion", "janus", "jupiter", "mars",
   "neptune", "odysseus", "orion", "orpheus", "pluto", "saturn", "zeus"];
 const TTS_VOICES = new Set(TTS_VOICE_LIST);
-const ORIGIN_TIMEOUT_MS_TTS = 8000; // a sleeping Mac shouldn't keep a child waiting
+const ORIGIN_TIMEOUT_MS_TTS = 30000; // a first-time clip takes a few seconds on the Mac; a sleeping Mac still falls back
 const MAX_AUDIO_BYTES = 2 * 1024 * 1024; // ~60 s of 16 kHz mono WAV
 const ORIGIN_TIMEOUT_MS = 12000; // a sleeping Hugging Face Space takes longer than this to wake
 
@@ -162,7 +162,7 @@ async function tts(request, url, env, ctx) {
 const MALE_AURA = new Set(["apollo", "arcas", "aries", "atlas", "draco", "hermes", "hyperion", "janus", "jupiter", "mars",
   "neptune", "odysseus", "orion", "orpheus", "pluto", "saturn", "zeus"]);
 function ownVoice(voice, env) {
-  return MALE_AURA.has(voice) ? "am_michael" : env.TTS_VOICE || "af_heart";
+  return MALE_AURA.has(voice) ? (env.TTS_VOICE_M || "am_michael") : env.TTS_VOICE || "af_heart";
 }
 
 // Your own voice server (e.g. Kokoro on a Mac) speaking the OpenAI-style API. Throws if it's down.

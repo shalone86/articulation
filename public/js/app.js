@@ -833,7 +833,11 @@ function nextPair() {
   const pool = pairPool();
   const game = document.getElementById("game");
   if (!pool.length) return (game.innerHTML = `<p class="muted">No pairs for this choice.</p>`);
-  const pair = pick(pool);
+  // Look three pairs ahead and fetch their audio now, so the next word plays the moment it appears.
+  if (ps.queueKey !== ps.filter || !ps.queue) { ps.queue = []; ps.queueKey = ps.filter; }
+  while (ps.queue.length < 4) ps.queue.push(pick(pool));
+  const pair = ps.queue.shift();
+  prefetch(ps.queue.flatMap((q) => [q.a, q.b]));
   const target = Math.random() < 0.5 ? pair.a : pair.b;
   const other = target === pair.a ? pair.b : pair.a;
   const p = phonemeById[pair.sound];
