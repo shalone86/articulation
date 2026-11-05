@@ -5,7 +5,7 @@
 // Strategy: network first for the app (so updates show up right away),
 // falling back to the cache when offline; cache first for fonts and voice clips.
 
-const VERSION = "v7";
+const VERSION = "v8";
 const SHELL = `shell-${VERSION}`;
 const RUNTIME = "runtime-v1";
 
