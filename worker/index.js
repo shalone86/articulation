@@ -15,9 +15,8 @@
 // Optional vars ANDROID_PACKAGE and ANDROID_SHA256 (comma-separated fingerprints) for assetlinks.
 
 const STT_MODEL = "@cf/openai/whisper-large-v3-turbo";
-// Single words use Aura-2 (the best tier); sentences of three or more words use MeloTTS (about 100x cheaper, one voice).
+// All speech uses Aura-2 (the nicer voice), sent as WAV so Safari plays even single words.
 const TTS_MODEL = "@cf/deepgram/aura-2-en";
-const SENTENCE_MODEL = "@cf/myshell-ai/melotts";
 // Aura-2 English voices, the default (helena) first (the Settings list shows them in this order).
 const TTS_VOICE_LIST = ["helena", "thalia", "asteria", "luna", "athena", "aurora", "iris", "cora", "delia", "harmonia",
   "andromeda", "amalthea", "callista", "cordelia", "electra", "hera", "juno", "minerva", "ophelia", "pandora", "phoebe",
@@ -127,48 +126,22 @@ async function tts(request, url, env, ctx) {
   const voice = TTS_VOICES.has(url.searchParams.get("voice")) ? url.searchParams.get("voice") : "helena";
 
 
-  const tier = text.split(/\s+/).length <= 2 ? "word" : "sentence";
+  // Everything uses Aura-2 (the nicer voice), as 24 kHz WAV: Safari won't reliably play its
+  // very short mp3 clips (single numbers).
   const cache = caches.default;
-  // Sentences sound the same whatever voice is chosen, so they share one cache entry.
-  const cacheKey = new Request(`https://tts.cache/${tier}/${tier === "word" ? voice : "melo"}/${encodeURIComponent(text)}`);
+  const cacheKey = new Request(`https://tts.cache/v3/aura/${voice}/${encodeURIComponent(text)}`);
   const hit = await cache.match(cacheKey);
   if (hit) return hit;
-
-  let res;
-  if (tier === "sentence") {
-    try {
-      res = audioResponse(await melotts(text, env), "melo");
-    } catch (e) {
-      console.warn("MeloTTS failed, using Aura-2:", String(e?.message ?? e));
-    }
-  }
-  if (!res) {
-    const raw = await env.AI.run(TTS_MODEL, { text, speaker: voice, encoding: "mp3" }, { returnRawResponse: true });
-    if (!raw.ok) return json({ error: `tts failed (${raw.status})` }, 502);
-    res = audioResponse(raw.body, "aura");
-  }
+  const raw = await env.AI.run(TTS_MODEL, { text, speaker: voice, encoding: "linear16", container: "wav", sample_rate: 24000 }, { returnRawResponse: true });
+  if (!raw.ok) return json({ error: `tts failed (${raw.status})` }, 502);
+  const res = new Response(await raw.arrayBuffer(), {
+    headers: { "content-type": "audio/wav", "cache-control": "public, max-age=2592000", "x-voice-source": "aura" },
+  });
   ctx.waitUntil(cache.put(cacheKey, res.clone()));
   return res;
 }
 
-// MeloTTS answers { audio: "<base64 mp3>" }, or the raw mp3 itself. Handle both.
-async function melotts(text, env) {
-  const out = await env.AI.run(SENTENCE_MODEL, { prompt: text, lang: "en" });
-  let bytes;
-  if (typeof out?.audio === "string") {
-    bytes = Uint8Array.from(atob(out.audio), (c) => c.charCodeAt(0));
-  } else if (out instanceof ReadableStream || out instanceof ArrayBuffer || ArrayBuffer.isView(out)) {
-    bytes = new Uint8Array(await new Response(out).arrayBuffer());
-  } else {
-    throw new Error("unexpected MeloTTS output");
-  }
-  if (bytes.byteLength < 500) throw new Error("MeloTTS sent an empty clip");
-  return bytes;
-}
 
-const audioResponse = (body, source) => new Response(body, {
-  headers: { "content-type": "audio/mpeg", "cache-control": "public, max-age=2592000", "x-voice-source": source },
-});
 
 function toBase64(buf) {
   const bytes = new Uint8Array(buf);
