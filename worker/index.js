@@ -7,7 +7,7 @@
 //   GET  /.well-known/assetlinks.json → proves the Android app owns this site (see docs/ANDROID.md)
 //
 // Optional secret APP_PASSCODE: when set, API calls need header x-app-passcode.
-// Optional var STT_ORIGIN (e.g. https://you-articulation.hf.space): send speech checks to the
+// Optional var STT_ORIGIN (e.g. https://you-articulation.hf.space), used only with var USE_OWN_STT = "true": send speech checks to the
 // self-hosted server instead (it adds forced-choice scoring); the site and voice stay here.
 // If that server is slow to answer (asleep) or down, checks fall back to Workers AI.
 //   STT_PASSCODE  secret: that server's APP_PASSCODE, if it has one
@@ -35,6 +35,9 @@ export default {
     if (env.APP_PASSCODE && request.headers.get("x-app-passcode") !== env.APP_PASSCODE) {
       return json({ error: "passcode required" }, 401);
     }
+    // Speech checks run on Cloudflare Workers AI. Your own Whisper server (STT_ORIGIN) is only used
+    // when USE_OWN_STT is "true", so a leftover STT_ORIGIN secret can't send checks to a Mac that's off.
+    if (env.USE_OWN_STT !== "true") env = { ...env, STT_ORIGIN: undefined };
     try {
       switch (`${request.method} ${url.pathname}`) {
         case "GET /api/health":
