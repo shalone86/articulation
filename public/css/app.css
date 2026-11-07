@@ -465,3 +465,26 @@ body:has(.bottom-bar) .foot { padding-bottom: 18px; }
 body.kid { font-size: 20px; }
 body.kid .rec { width: 124px; height: 124px; font-size: 3.2rem; }
 body.kid .keys { display: none; }
+
+/* Back to all Angelio games (angelio.org). articulate.shalonely.com keeps working as it is. */
+.hub-link { display: inline-grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 11px;
+  background: linear-gradient(#5bb4ff, #bfe3ff); box-shadow: 0 2px 0 #3a8fd9; margin-right: 4px; }
+.hub-link img { width: 28px; height: 28px; border-radius: 8px; }
+
+/* Small screens: the card is only as tall as the side you're looking at (the hidden side no longer
+   stretches it), and everything is a bit more compact so the word, the mic and the tips fit. */
+@media (max-width: 720px) {
+  .flip:not(.flipped) .face.back, .flip.flipped .face.front { position: absolute; inset: 0 0 auto 0; max-height: 100%; }
+  .flip { position: relative; }
+}
+@media (max-width: 480px), (max-height: 720px) {
+  .face { padding: 12px 12px 14px; gap: 8px; }
+  .glyph { gap: 10px; }
+  .glyph b { font-size: clamp(2.4rem, 11vw, 3.4rem); }
+  .glyph .emoji { font-size: 2.1rem; }
+  .glyph .ipa { font-size: 1.3rem; }
+  .rec { width: 78px !important; height: 78px !important; font-size: 2rem !important; }
+  .card-wrap { margin-top: 2px; }
+  body:has(.bottom-bar) { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .bottom-bar { padding-top: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+}
