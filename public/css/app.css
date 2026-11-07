@@ -488,3 +488,32 @@ body.kid .keys { display: none; }
   body:has(.bottom-bar) { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
   .bottom-bar { padding-top: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
 }
+
+/* Phones turned sideways (short, wide screens): one-line top bar, the card's front in two columns,
+   and the prev / record / flip / next bar as a column on the right. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .topbar { flex-wrap: nowrap; padding-top: 4px; padding-bottom: 4px; min-height: 0; }
+  .top-search, .brand-name, .nav a.install-link { display: none !important; }
+  .nav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .nav a { padding: 4px 9px; white-space: nowrap; }
+  .crumbs, .keys { display: none; }
+  main { padding-right: 112px; }
+  .card-wrap { margin-top: 2px; }
+  .card-toolbar { margin-bottom: 4px; }
+  .face { min-height: 0; padding: 10px 14px 12px; gap: 6px; }
+  .flip:not(.flipped) .face.back, .flip.flipped .face.front { position: absolute; inset: 0 0 auto 0; max-height: 100%; }
+  .flip { position: relative; }
+  .face.front { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; align-content: start; }
+  .face.front > * { grid-column: 1; }
+  .face.front > .rec-row, .face.front > .status { grid-column: 2; }
+  .face.front > .rec-row { grid-row: 2 / span 2; align-self: center; }
+  .face.front > .status { grid-row: 4; font-size: .85rem; max-width: 170px; }
+  .face.front > .face-head { grid-column: 1 / -1; }
+  .glyph b { font-size: 2.6rem; } .glyph .emoji { font-size: 2rem; } .glyph .ipa { font-size: 1.2rem; }
+  .rec { width: 76px !important; height: 76px !important; font-size: 2rem !important; }
+  .bottom-bar { left: auto; top: 0; bottom: 0; right: 0; width: 100px; flex-direction: column; justify-content: center;
+    border-top: none; border-left: var(--border-w) solid var(--border); padding: 8px; }
+  .bottom-bar > * { flex: 0 0 auto; min-height: 52px; }
+  .bottom-bar .flip-btn { min-height: 72px; }
+  body:has(.bottom-bar) { padding-bottom: 8px; }
+}
