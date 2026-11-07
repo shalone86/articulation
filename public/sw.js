@@ -5,9 +5,12 @@
 // Strategy: network first for the app (so updates show up right away),
 // falling back to the cache when offline; cache first for fonts and voice clips.
 
-const VERSION = "v8";
-const SHELL = `shell-${VERSION}`;
-const RUNTIME = "runtime-v1";
+const VERSION = "v9";
+// Cache names start with the app id: several apps can share one site (angelio.org/regroup/, /snap/…),
+// and each must only clean up its own caches.
+const APP = "articulate";
+const SHELL = `${APP}-shell-${VERSION}`;
+const RUNTIME = `${APP}-runtime-v1`;
 
 const ASSETS = [
   "./", "index.html", "manifest.webmanifest", "icon.svg",
@@ -26,7 +29,7 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== SHELL && k !== RUNTIME).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => (k.startsWith(`${APP}-`) || /^(shell|runtime)-/.test(k)) && k !== SHELL && k !== RUNTIME).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
