@@ -12,6 +12,7 @@ import { speak, playUrl, stop as stopAudio, browserVoices, prefetch } from "./tt
 import { health, transcribe } from "./api.js";
 import { search, cardsForWord, patternsIn } from "./search.js";
 import { CHECKUP_SENTENCES, analyzeCheckup } from "./checkup.js";
+import { sentenceFor } from "./data/word-sentences.js";
 import * as store from "./store.js";
 import { jingleOnce } from "./jingle.js";
 import { sfx, installClickSounds } from "./sound.js";
@@ -368,7 +369,7 @@ function showCard(card, { crumbs, count = "", prev, next }) {
   renderBack();
   // Warm the voice for this card once the learner stops on it (not while paging quickly).
   const mine = cs;
-  setTimeout(() => cs === mine && prefetch([mine.target, card.sentence].filter(Boolean)), 600);
+  setTimeout(() => cs === mine && prefetch([mine.target, sentenceFor(card, mine.target)].filter(Boolean)), 600);
 }
 
 function go(dir) {
@@ -401,7 +402,7 @@ function targetPicker() {
       const st = store.wordStatus(c.id, w);
       return `<button class="chip ${st} ${!cs.isSentence && w === cs.target ? "on" : ""}" data-target="${esc(w)}" title="${st === "won" ? "You’ve said this one right" : st === "tried" ? "Tried, not matched yet" : "Not tried yet"}">${esc(w)}${st === "won" ? ` <span class="mk">✓</span>` : st === "tried" ? ` <span class="mk">○</span>` : ""}</button>`;
     }).join("")}
-    ${c.sentence ? `<button class="chip sentence ${cs.isSentence ? "on" : ""}" data-target="__sentence">💬 sentence</button>` : ""}
+    ${curSentence() ? `<button class="chip sentence ${cs.isSentence ? "on" : ""}" data-target="__sentence">💬 sentence</button>` : ""}
   </div>`;
 }
 
@@ -414,7 +415,7 @@ function catLabel(c) {
 
 function renderFront() {
   const c = cs.card;
-  const target = cs.isSentence ? c.sentence : cs.target;
+  const target = cs.isSentence ? curSentence() : cs.target;
   document.getElementById("front").innerHTML = `
     <header class="face-head"><span class="cat-pill">${esc(catLabel(c))}</span>${c.kind === "word" ? "" : stars(store.stars(c.id))}</header>
     <div class="glyph">${c.emoji ? `<span class="emoji" aria-hidden="true">${c.emoji}</span>` : ""}<b>${esc(c.big)}</b>${ipa(c.ipa)}</div>
@@ -537,19 +538,22 @@ function miniCard(c) {
   return c ? `<a class="mini-card" data-cat="${c.cat}" href="#/c/${c.id}"><b>${esc(c.big)}</b>${ipa(c.ipa)}<small>${esc(c.words[0])}</small></a>` : "";
 }
 
+/** The practice sentence for the word on screen: it always has that word in it. */
+const curSentence = () => sentenceFor(cs.card, cs.target);
+
 function renderBack() {
   const c = cs.card;
   const tabs = backTabs(c);
   if (!tabs.some(([id]) => id === cs.tab)) cs.tab = tabs[0][0];
-  const target = cs.isSentence ? c.words[0] : cs.target;
+  const target = cs.target; // the sentence below always uses this word
   document.getElementById("back").innerHTML = `
     <header class="face-head"><span class="cat-pill">${esc(catLabel(c))}</span><span class="big-label">${esc(c.big)} ${ipa(c.ipa)}</span></header>
     <div class="listen">
       <button class="btn primary big-say" data-say="${esc(target)}">🔊 ${esc(target)}</button>
       <button class="btn" data-say="${esc(target)}" data-slow="1">🐢 Slowly</button>
-      ${c.sentence ? `<button class="btn" data-say="${esc(c.sentence)}">💬 Sentence</button>` : ""}
+      ${curSentence() ? `<button class="btn" data-say="${esc(curSentence())}">💬 Sentence</button>` : ""}
     </div>
-    ${c.sentence ? `<p class="sentence-text center">“${esc(c.sentence)}”</p>` : ""}
+    ${curSentence() ? `<p class="sentence-text center">“${esc(curSentence())}”</p>` : ""}
     <div class="tabs" role="tablist">${tabs.map(([id, label]) =>
       `<button role="tab" aria-selected="${id === cs.tab}" data-tab="${id}">${esc(label)}</button>`).join("")}</div>
     ${tabs.map(([id, , html]) => `<section class="tab-panel" role="tabpanel" data-panel="${id}" ${id === cs.tab ? "" : "hidden"}>${html}</section>`).join("")}`;
@@ -595,7 +599,7 @@ async function finishRecording() {
   if (recorder.state !== "recording") return;
   const mine = cs;
   const myCard = cs.card;
-  const target = cs.isSentence ? cs.card.sentence : cs.target;
+  const target = cs.isSentence ? curSentence() : cs.target;
   mine.busy = true;
   document.getElementById("status").textContent = "Checking…";
   const btn = document.getElementById("rec");
@@ -642,7 +646,7 @@ $app.addEventListener("click", async (e) => {
   if (!t) return;
   if (t.dataset.go) { e.preventDefault(); return go(t.dataset.go); }
   if (t.id === "rec") return toggleRecord();
-  if (t.id === "bar-act") return cs.flipped ? speak(cs.isSentence ? cs.card.sentence : cs.target).catch((err) => toast(`🔇 ${err.message}`)) : toggleRecord();
+  if (t.id === "bar-act") return cs.flipped ? speak(cs.isSentence ? curSentence() : cs.target).catch((err) => toast(`🔇 ${err.message}`)) : toggleRecord();
   if (t.hasAttribute("data-flip")) return flip();
   if (t.dataset.side) return flip(t.dataset.side === "back");
   if (t.dataset.tab) {
@@ -657,7 +661,7 @@ $app.addEventListener("click", async (e) => {
     cs.take = cs.result = null;
     renderFront();
     renderBack();
-    prefetch([cs.isSentence ? cs.card.sentence : cs.target]);
+    prefetch([cs.isSentence ? curSentence() : cs.target]);
     return;
   }
   if (t.hasAttribute("data-play-mine") && cs.take) return playUrl(cs.take.url).catch((err) => toast(`🔇 ${err.message}`));
@@ -665,7 +669,7 @@ $app.addEventListener("click", async (e) => {
     try {
       await playUrl(cs.take.url);
       await new Promise((r) => setTimeout(r, 400));
-      await speak(cs.isSentence ? cs.card.sentence : cs.target);
+      await speak(cs.isSentence ? curSentence() : cs.target);
     } catch (err) { toast(`🔇 ${err.message}`); }
   }
 });

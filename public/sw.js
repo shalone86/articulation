@@ -5,7 +5,7 @@
 // Strategy: network first for the app (so updates show up right away),
 // falling back to the cache when offline; cache first for fonts and voice clips.
 
-const VERSION = "v12";
+const VERSION = "v13";
 // Cache names start with the app id: several apps can share one site (angelio.org/regroup/, /snap/…),
 // and each must only clean up its own caches.
 const APP = "articulate";
@@ -19,7 +19,7 @@ const ASSETS = [
   "js/app.js", "js/api.js", "js/audio.js", "js/checkup.js", "js/decks.js", "js/score.js", "js/search.js",
   "js/sound.js", "js/store.js", "js/jingle.js", "js/tts.js", "js/wav.js",
   "js/data/phonemes.js", "js/data/graphemes.js", "js/data/lessons.js",
-  "js/data/homophones.js", "js/data/languages.js", "js/data/l1-focus.js",
+  "js/data/homophones.js", "js/data/word-sentences.js", "js/data/languages.js", "js/data/l1-focus.js",
 ];
 
 self.addEventListener("install", (e) => {
