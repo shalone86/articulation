@@ -13,6 +13,7 @@ import { health, transcribe } from "./api.js";
 import { search, cardsForWord, patternsIn } from "./search.js";
 import { CHECKUP_SENTENCES, analyzeCheckup } from "./checkup.js";
 import * as store from "./store.js";
+import { jingleOnce } from "./jingle.js";
 import { sfx, installClickSounds } from "./sound.js";
 
 const $app = document.getElementById("app");
@@ -1364,6 +1365,7 @@ applyLook();
 updateInstallLink();
 window.addEventListener("hashchange", route);
 installClickSounds();
+jingleOnce("articulate", () => store.settings().sounds); // the app's little logo sound, on the first tap
 route();
 health(); // warm up: the first tap on 🔊 shouldn't wait for this
 
