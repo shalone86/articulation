@@ -9,7 +9,7 @@ import { DECKS, deckById, cardById, ALL_CARDS, GRAPHEME_TYPES } from "./decks.js
 import { Recorder, micSupported } from "./audio.js";
 import { scoreWord, scoreSentence, isSuccess, candidatesFor, refineWithScores, normalize } from "./score.js";
 import { speak, playUrl, stop as stopAudio, browserVoices, prefetch } from "./tts.js";
-import { health, transcribe } from "./api.js";
+import { health, transcribe, familyCode, setFamilyCode, checkFamilyCode } from "./api.js";
 import { search, cardsForWord, patternsIn } from "./search.js";
 import { CHECKUP_SENTENCES, analyzeCheckup } from "./checkup.js";
 import { sentenceFor } from "./data/word-sentences.js";
@@ -1081,6 +1081,11 @@ async function viewSettings() {
         <label>Passcode (only if your server requires one)
           <input id="passcode" type="password" autocomplete="off" value="${esc(s.passcode)}"></label>
       </fieldset>
+      <fieldset><legend>🎙️ Family code</legend>
+        <p class="muted">Speech checks may need a family code (a few free tries each day without one). Enter it once on this device.</p>
+        <label>Family code <input id="family-code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX" value="${esc(familyCode())}"></label>
+        <p id="family-status" class="muted" aria-live="polite"></p>
+      </fieldset>
       <fieldset><legend>Backup</legend>
         <div class="row"><button class="btn" id="export">⬇ Download progress</button>
         <label class="btn">⬆ Restore <input type="file" id="import" accept="application/json" hidden></label></div>
@@ -1100,6 +1105,17 @@ async function viewSettings() {
   for (const id of ["showIpa", "kidMode", "autoSay", "sounds"]) on(id, "change", (e) => { store.setSetting(id, e.target.checked); applyLook(); });
   on("rate", "input", (e) => { store.setSetting("rate", +e.target.value); document.getElementById("rate-out").textContent = e.target.value; });
   on("passcode", "change", async (e) => { store.setSetting("passcode", e.target.value.trim()); await showHealth(true); });
+  const famStatus = async () => {
+    const el = document.getElementById("family-status"), c = familyCode();
+    if (!el) return;
+    if (!c) { el.textContent = ""; return; }
+    el.textContent = "Checking…";
+    const r = await checkFamilyCode(c);
+    el.textContent = r.valid ? `✅ On for the ${r.name}: ${r.left} of ${r.limit} speech checks left this month.`
+      : r.offline ? "Couldn’t check the code right now." : r.revoked ? "That code has been turned off." : "That code doesn’t work. Check the letters.";
+  };
+  on("family-code", "change", (e) => { setFamilyCode(e.target.value.trim().toUpperCase()); famStatus(); });
+  famStatus();
   on("export", "click", () => {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([store.exportData()], { type: "application/json" }));

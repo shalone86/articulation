@@ -7,12 +7,16 @@
 //   GET  /.well-known/assetlinks.json → proves the Android app owns this site (see docs/ANDROID.md)
 //
 // Optional secret APP_PASSCODE: when set, API calls need header x-app-passcode.
+// Family codes (worker/codes.js, KV binding CODES): set var REQUIRE_CODE = "true" and speech checks need
+// a code in header x-angelio-code after a few free tries a day. GET /api/code?c=… checks a code.
 // Optional var STT_ORIGIN (e.g. https://you-articulation.hf.space), used only with var USE_OWN_STT = "true": send speech checks to the
 // self-hosted server instead (it adds forced-choice scoring); the site and voice stay here.
 // If that server is slow to answer (asleep) or down, checks fall back to Workers AI.
 //   STT_PASSCODE  secret: that server's APP_PASSCODE, if it has one
 //   STT_TOKEN     secret: a Hugging Face token, if the Space is private
 // Optional vars ANDROID_PACKAGE and ANDROID_SHA256 (comma-separated fingerprints) for assetlinks.
+
+import { checkSpeech, codeStatus } from "./codes.js";
 
 const STT_MODEL = "@cf/openai/whisper-large-v3-turbo";
 // All speech uses Aura-2 (the nicer voice), sent as WAV so Safari plays even single words.
@@ -44,14 +48,21 @@ export default {
           if (env.STT_ORIGIN) return await proxyHealth(env);
           return json({ stt: !!env.AI, tts: !!env.AI, backend: "Cloudflare Workers AI", model: STT_MODEL.split("/").pop(), voices: TTS_VOICE_LIST });
         case "POST /api/transcribe": {
+          // Family codes (worker/codes.js): only when var REQUIRE_CODE is "true"; otherwise open as before.
+          const gate = await checkSpeech(request, env);
+          if (!gate.ok) return json(gate.body, gate.status);
           const audio = await request.arrayBuffer();
           if (!audio.byteLength) return json({ error: "empty audio" }, 400);
           if (audio.byteLength > MAX_AUDIO_BYTES) return json({ error: "audio too long" }, 413);
-          if (env.STT_ORIGIN) {
-            const r = await proxyTranscribe(audio, url, env).catch((e) => (console.warn("STT origin failed:", e.message), null));
-            if (r?.ok) return r;
-          }
-          return await transcribe(audio, env);
+          let r = null;
+          if (env.STT_ORIGIN) r = await proxyTranscribe(audio, url, env).catch((e) => (console.warn("STT origin failed:", e.message), null));
+          if (!r?.ok) r = await transcribe(audio, env);
+          if (r.ok) ctx.waitUntil(gate.charge());
+          return r;
+        }
+        case "GET /api/code": {
+          const st = await codeStatus(env, url.searchParams.get("c"));
+          return json(st.valid ? { valid: true, name: st.name, limit: st.limit, left: st.left } : { valid: false, revoked: !!st.revoked });
         }
         case "GET /api/tts":
           return await tts(request, url, env, ctx);

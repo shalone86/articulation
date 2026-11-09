@@ -9,6 +9,9 @@
     "run_worker_first": ["/api/*", "/.well-known/*"]
   },
   "ai": { "binding": "AI" },
+  // Shared Angelio store: family codes and daily safety caps (worker/codes.js). Speech checks stay
+  // open until "REQUIRE_CODE": "true" is added to "vars" (planned: after the owner hands out codes).
+  "kv_namespaces": [{ "binding": "CODES", "id": "a39d9bda676b420394c3eaba35975dec" }],
   "observability": { "enabled": true },
   "workers_dev": true,
   "routes": [{ "pattern": "articulate.shalonely.com", "custom_domain": true }]

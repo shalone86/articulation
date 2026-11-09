@@ -5,7 +5,7 @@
 // Strategy: network first for the app (so updates show up right away),
 // falling back to the cache when offline; cache first for fonts and voice clips.
 
-const VERSION = "v13";
+const VERSION = "v14";
 // Cache names start with the app id: several apps can share one site (angelio.org/regroup/, /snap/…),
 // and each must only clean up its own caches.
 const APP = "articulate";
