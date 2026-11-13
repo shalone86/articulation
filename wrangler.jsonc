@@ -13,7 +13,7 @@
   "kv_namespaces": [{ "binding": "CODES", "id": "a39d9bda676b420394c3eaba35975dec" }],
   // Speech checks need a family code after FREE_PER_DAY free tries a day (per network), with a
   // site-wide daily safety cap. Codes are made at angelio.org/admin/. Set REQUIRE_CODE to "false" to open them again.
-  "vars": { "REQUIRE_CODE": "true", "FREE_PER_DAY": "3", "SPEECH_DAILY_CAP": "500" },
+  "vars": { "REQUIRE_CODE": "true", "FREE_PER_DAY": "20", "SPEECH_DAILY_CAP": "500" },
   "observability": { "enabled": true },
   "workers_dev": true,
   "routes": [{ "pattern": "articulate.shalonely.com", "custom_domain": true }]

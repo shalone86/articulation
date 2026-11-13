@@ -1082,7 +1082,7 @@ async function viewSettings() {
           <input id="passcode" type="password" autocomplete="off" value="${esc(s.passcode)}"></label>
       </fieldset>
       <fieldset><legend>🎙️ Family code</legend>
-        <p class="muted">Speech checks may need a family code (a few free tries each day without one). Enter it once on this device.</p>
+        <p class="muted">Speech checks may need a family code (20 free tries each day without one). Enter it once on this device.</p>
         <label>Family code <input id="family-code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX" value="${esc(familyCode())}"></label>
         <p id="family-status" class="muted" aria-live="polite"></p>
       </fieldset>
